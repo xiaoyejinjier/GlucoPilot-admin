@@ -1,0 +1,27 @@
+{
+  "name": "kangtang-admin-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "控糖健康管理系统（AI控糖助手）PC 后台管理前端（Vue3 + TS + Element Plus，纯前端 Mock 数据）",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "type-check": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "echarts": "^5.6.0",
+    "element-plus": "^2.9.1",
+    "pinia": "^2.3.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "~5.6.3",
+    "vite": "^5.4.11",
+    "vue-tsc": "^2.1.10"
+  }
+}

@@ -1,0 +1,137 @@
+<template>
+  <div class="page-wrap">
+    <div class="head">
+      <h2 class="page-title">反馈管理</h2>
+      <el-button :icon="Refresh" @click="load">刷新</el-button>
+    </div>
+
+    <div class="kt-card">
+      <div class="filter mb12">
+        <el-select v-model="q.type" placeholder="反馈类型" clearable style="width: 150px">
+          <el-option v-for="t in types" :key="t" :label="t" :value="t" />
+        </el-select>
+        <el-select v-model="q.status" placeholder="处理状态" clearable style="width: 150px">
+          <el-option label="待处理" value="received" />
+          <el-option label="处理中" value="processing" />
+          <el-option label="已完成" value="done" />
+        </el-select>
+        <el-input v-model="q.keyword" placeholder="关键词" clearable :prefix-icon="Search" style="width: 200px" />
+        <span class="text-muted" style="font-size: 12px">状态流转：待处理 → 处理中 → 已完成</span>
+      </div>
+
+      <el-table :data="filtered" v-loading="loading">
+        <el-table-column prop="id" label="ID" width="60" />
+        <el-table-column label="用户" width="120">
+          <template #default="{ row }">{{ row.userName }}</template>
+        </el-table-column>
+        <el-table-column label="类型" width="110">
+          <template #default="{ row }"><el-tag size="small" effect="plain">{{ row.type }}</el-tag></template>
+        </el-table-column>
+        <el-table-column prop="content" label="反馈内容" min-width="280" show-overflow-tooltip />
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag size="small" :type="statusType(row.status)">{{ statusText(row.status) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="createdAt" label="提交时间" width="160" />
+        <el-table-column label="操作" width="140" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="openHandle(row)">处理</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
+    <el-dialog v-model="dialog.visible" :title="`处理反馈 #${dialog.row?.id}`" width="560px">
+      <template v-if="dialog.row">
+        <div class="kt-card mb12" style="background: #fafafa">
+          <div class="text-muted" style="font-size: 13px">{{ dialog.row.userName }} · {{ dialog.row.type }} · {{ dialog.row.createdAt }}</div>
+          <p style="margin: 8px 0 0">{{ dialog.row.content }}</p>
+          <div v-if="dialog.row.reply" style="margin-top: 8px; font-size: 13px" class="reply-pre">上次回复：{{ dialog.row.reply }}</div>
+        </div>
+        <el-form label-width="90px">
+          <el-form-item label="处理状态">
+            <el-radio-group v-model="form.status">
+              <el-radio value="received">待处理</el-radio>
+              <el-radio value="processing">处理中</el-radio>
+              <el-radio value="done">已完成</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item label="回复内容">
+            <el-input v-model="form.reply" type="textarea" :rows="4" placeholder="填写给用户的回复（将回写小程序端）" />
+          </el-form-item>
+        </el-form>
+      </template>
+      <template #footer>
+        <el-button @click="dialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="saveReply">提交处理</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { Refresh, Search } from '@element-plus/icons-vue'
+import { api } from '@/api'
+import { useAuthStore } from '@/stores/auth'
+import type { Feedback, FeedbackStatus, FeedbackType } from '@/types'
+
+const auth = useAuthStore()
+const types: FeedbackType[] = ['产品建议', '功能异常', '内容问题', '其他']
+const loading = ref(false)
+const saving = ref(false)
+const list = ref<Feedback[]>([])
+const q = reactive({ type: '' as FeedbackType | '', status: '' as FeedbackStatus | '', keyword: '' })
+const dialog = reactive<{ visible: boolean; row: Feedback | null }>({ visible: false, row: null })
+const form = reactive({ status: 'received' as FeedbackStatus, reply: '' })
+
+async function load() {
+  loading.value = true
+  list.value = await api.listFeedback()
+  loading.value = false
+}
+onMounted(load)
+
+const filtered = computed(() =>
+  list.value.filter(
+    (f) =>
+      (!q.type || f.type === q.type) &&
+      (!q.status || f.status === q.status) &&
+      (!q.keyword || f.content.includes(q.keyword) || f.userName.includes(q.keyword))
+  )
+)
+
+function statusType(s: FeedbackStatus): 'danger' | 'warning' | 'success' {
+  return s === 'received' ? 'danger' : s === 'processing' ? 'warning' : 'success'
+}
+function statusText(s: FeedbackStatus): string {
+  return s === 'received' ? '待处理' : s === 'processing' ? '处理中' : '已完成'
+}
+
+function openHandle(row: Feedback) {
+  dialog.row = row
+  form.status = row.status
+  form.reply = row.reply
+  dialog.visible = true
+}
+
+async function saveReply() {
+  if (!dialog.row) return
+  saving.value = true
+  await api.replyFeedback(dialog.row.id, form.reply, form.status)
+  if (auth.account) api.writeLog(auth.account.username, auth.account.role, '反馈', '处理反馈', `#${dialog.row.id} → ${statusText(form.status)}`)
+  saving.value = false
+  dialog.visible = false
+  ElMessage.success('已提交')
+  await load()
+}
+</script>
+
+<style scoped>
+.head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.page-title { margin: 0; font-size: 18px; }
+.filter { display: flex; gap: 10px; align-items: center; }
+.reply-pre { color: var(--kt-muted); }
+</style>

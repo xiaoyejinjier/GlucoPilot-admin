@@ -1,0 +1,110 @@
+/* ============================================================
+   控糖健康管理系统 · 后台设计令牌
+   与小程序端（app.wxss / utils/display.js）保持一致：
+   green(#07c160) / teal(#0d9488) / simple(#374151) 三套主题
+   ============================================================ */
+
+:root {
+  --kt-bg: #f2f4f3;
+  --kt-surface: #ffffff;
+  --kt-ink: #1c1c1c;
+  --kt-muted: #6b7280;
+  --kt-line: #e5e7eb;
+  --kt-brand: #07c160;
+  --kt-brand-dark: #06ad56;
+  --kt-brand-soft: #e8f8ef;
+  --kt-wx-green: #95ec69;
+  --kt-warn: #fa9d3b;
+  --kt-danger: #fa5151;
+  --kt-ok: #07c160;
+  --kt-radius: 10px;
+  --kt-sidebar-w: 224px;
+  --kt-sidebar-w-collapsed: 64px;
+
+  /* Element Plus 主色对齐 */
+  --el-color-primary: #07c160;
+  --el-color-primary-light-3: #4cd98a;
+  --el-color-primary-light-5: #7ee6a9;
+  --el-color-primary-light-7: #b3f1cd;
+  --el-color-primary-light-8: #ccf6de;
+  --el-color-primary-light-9: #e8f8ef;
+  --el-color-primary-dark-2: #06ad56;
+  --el-color-success: #07c160;
+  --el-color-warning: #fa9d3b;
+  --el-color-danger: #fa5151;
+  --el-color-error: #fa5151;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  color: var(--kt-ink);
+  background: var(--kt-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 主题类：切换 --kt-brand 等 */
+.theme-teal {
+  --kt-brand: #0d9488;
+  --kt-brand-dark: #0f766e;
+  --kt-brand-soft: #e6f7f5;
+  --kt-wx-green: #5eead4;
+  --el-color-primary: #0d9488;
+  --el-color-primary-light-3: #52b3ab;
+  --el-color-primary-light-5: #8ccbc6;
+  --el-color-primary-light-7: #c2e3e0;
+  --el-color-primary-light-8: #d6ecea;
+  --el-color-primary-light-9: #e6f7f5;
+  --el-color-primary-dark-2: #0f766e;
+  --el-color-success: #0d9488;
+}
+
+.theme-simple {
+  --kt-brand: #374151;
+  --kt-brand-dark: #1f2937;
+  --kt-brand-soft: #f3f4f6;
+  --kt-wx-green: #9ca3af;
+  --el-color-primary: #374151;
+  --el-color-primary-light-3: #6b7280;
+  --el-color-primary-light-5: #9ca3af;
+  --el-color-primary-light-7: #c8ccd2;
+  --el-color-primary-light-8: #d9dce0;
+  --el-color-primary-light-9: #f3f4f6;
+  --el-color-primary-dark-2: #1f2937;
+  --el-color-success: #374151;
+}
+
+/* 通用布局辅助 */
+.page-wrap {
+  padding: 16px;
+}
+.mb12 { margin-bottom: 12px; }
+.mb16 { margin-bottom: 16px; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.text-muted { color: var(--kt-muted); }
+.brand-text { color: var(--kt-brand); font-weight: 600; }
+
+/* 卡片统一风格（对齐小程序 card：白底圆角轻阴影） */
+.kt-card {
+  background: var(--kt-surface);
+  border-radius: var(--kt-radius);
+  border: 1px solid var(--kt-line);
+  padding: 16px;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
