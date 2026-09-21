@@ -54,6 +54,7 @@ export interface MenuChild {
   path: string
   title: string
   icon?: string
+  roles?: Role[]
 }
 export interface MenuGroup {
   title: string

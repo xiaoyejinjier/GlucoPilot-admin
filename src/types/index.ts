@@ -108,7 +108,7 @@ export interface FoodItem {
   categoryName: string
   carbs: number // 每 100g 碳水 g
   cal: number // 每 100g 热量 kcal
-  gi?: number | null
+  gi: number | null
   image: string
   description: string
   enabled: boolean

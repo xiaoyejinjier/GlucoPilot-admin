@@ -180,9 +180,9 @@ function load(): DBShape {
 
 let db: DBShape = load()
 
-function persist() {
+function persist(state: DBShape = db) {
   try {
-    localStorage.setItem(DB_KEY, JSON.stringify(db))
+    localStorage.setItem(DB_KEY, JSON.stringify(state))
   } catch {
     /* storage full/无权限时静默（演示） */
   }
