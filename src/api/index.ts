@@ -19,6 +19,9 @@ const remote = {
       nickname: string
       role: Role
       opsId: number | string
+      roles?: string[]
+      permissions?: string[]
+      menus?: Array<{ path?: string | null }>
     }>('/admin/v1/auth/sessions', { username, password }, false)
     setAccessToken(data.accessToken)
     const acc: Omit<AdminAccount, 'password'> = {
@@ -28,7 +31,10 @@ const remote = {
       role: data.role === 'admin' ? 'admin' : 'editor',
       status: 1,
       createdAt: '',
-      lastLoginAt: new Date().toLocaleString('zh-CN', { hour12: false })
+      lastLoginAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+      roles: data.roles || [],
+      permissions: data.permissions || [],
+      menuPaths: (data.menus || []).map((menu) => menu.path).filter((path): path is string => Boolean(path))
     }
     return acc
   },

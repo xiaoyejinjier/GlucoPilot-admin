@@ -98,6 +98,7 @@ import { ElMessage } from 'element-plus'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { menuGroups, type MenuGroup } from '@/router'
+import { adminConfig } from '@/config'
 import type { ThemeId } from '@/types'
 
 const app = useAppStore()
@@ -120,13 +121,16 @@ const activePath = computed(() => route.path)
 
 function filterChildren(g: MenuGroup): MenuGroup {
   const role = auth.account?.role
-  const children = g.children.filter((c) => !('roles' in c) || !c.roles || !role || (c.roles as string[]).includes(role))
+  const children = g.children.filter((c) => {
+    if (!adminConfig.useMock) return !c.permission || auth.hasPermission(c.permission)
+    return !c.roles || !role || c.roles.includes(role)
+  })
   return { ...g, children }
 }
 const visibleGroups = computed(() =>
   menuGroups
     .map(filterChildren)
-    .filter((g) => !auth.account || g.roles.includes(auth.account.role))
+    .filter((g) => !auth.account || !adminConfig.useMock || g.roles.includes(auth.account.role))
     .filter((g) => g.children.length > 0)
 )
 

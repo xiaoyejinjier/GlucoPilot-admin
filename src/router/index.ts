@@ -10,6 +10,7 @@ declare module 'vue-router' {
     title?: string
     icon?: string
     roles?: Role[]
+    permission?: string
     hidden?: boolean
     placeholder?: string
   }
@@ -29,22 +30,22 @@ export const routes: RouteRecordRaw[] = [
     component: AdminLayout,
     redirect: '/dashboard',
     children: [
-      { path: 'dashboard', name: 'dashboard', component: () => import('@/views/dashboard/DashboardView.vue'), meta: { title: '数据看板', icon: 'DataBoard', roles: ['admin', 'editor'] } },
-      { path: 'content/news', name: 'news', component: () => import('@/views/content/NewsListView.vue'), meta: { title: '资讯管理', icon: 'Document', roles: ['admin', 'editor'] } },
-      { path: 'content/news/new', name: 'news-new', component: () => import('@/views/content/NewsEditView.vue'), meta: { title: '新建资讯', roles: ['admin', 'editor'], hidden: true } },
-      { path: 'content/news/:id/edit', name: 'news-edit', component: () => import('@/views/content/NewsEditView.vue'), meta: { title: '编辑资讯', roles: ['admin', 'editor'], hidden: true } },
-      { path: 'content/banners', name: 'banners', component: () => import('@/views/content/BannerView.vue'), meta: { title: '轮播图管理', icon: 'Picture', roles: ['admin', 'editor'] } },
-      { path: 'content/media', name: 'media', component: () => import('@/views/content/MediaView.vue'), meta: { title: '媒体素材', icon: 'FolderOpened', roles: ['admin', 'editor'] } },
-      { path: 'nutrition/foods', name: 'foods', component: () => import('@/views/nutrition/FoodView.vue'), meta: { title: '营养库管理', icon: 'Apple', roles: ['admin', 'editor'] } },
-      { path: 'users', name: 'users', component: () => import('@/views/users/UserListView.vue'), meta: { title: '用户管理', icon: 'User', roles: ['admin'] } },
-      { path: 'user-service/archives', name: 'archives', component: () => import('@/views/users/ArchiveView.vue'), meta: { title: '健康档案', icon: 'Files', roles: ['admin'] } },
-      { path: 'feedback', name: 'feedback', component: () => import('@/views/users/FeedbackView.vue'), meta: { title: '反馈管理', icon: 'ChatLineSquare', roles: ['admin', 'editor'] } },
-      { path: 'exports', name: 'exports', component: () => import('@/views/users/ExportView.vue'), meta: { title: '导出任务', icon: 'Download', roles: ['admin', 'editor'] } },
-      { path: 'system/roles', name: 'roles', component: () => import('@/views/system/RoleView.vue'), meta: { title: '角色权限', icon: 'Lock', roles: ['admin'] } },
-      { path: 'system/config', name: 'config', component: () => import('@/views/system/ConfigView.vue'), meta: { title: '系统参数', icon: 'Setting', roles: ['admin'] } },
-      { path: 'system/logs', name: 'logs', component: () => import('@/views/system/LogView.vue'), meta: { title: '操作日志', icon: 'Tickets', roles: ['admin'] } },
-      { path: 'message/push', name: 'push', component: () => import('@/views/placeholder/PlaceholderView.vue'), meta: { title: '消息推送', icon: 'Bell', roles: ['admin'], placeholder: '消息推送（二期）' } },
-      { path: 'ai/config', name: 'ai-config', component: () => import('@/views/placeholder/PlaceholderView.vue'), meta: { title: 'AI 服务配置', icon: 'MagicStick', roles: ['admin'], placeholder: 'AI 服务配置（二期）' } }
+      { path: 'dashboard', name: 'dashboard', component: () => import('@/views/dashboard/DashboardView.vue'), meta: { title: '数据看板', icon: 'DataBoard', roles: ['admin', 'editor'], permission: 'dashboard:view' } },
+      { path: 'content/news', name: 'news', component: () => import('@/views/content/NewsListView.vue'), meta: { title: '资讯管理', icon: 'Document', roles: ['admin', 'editor'], permission: 'content:news:list' } },
+      { path: 'content/news/new', name: 'news-new', component: () => import('@/views/content/NewsEditView.vue'), meta: { title: '新建资讯', roles: ['admin', 'editor'], hidden: true, permission: 'content:news:edit' } },
+      { path: 'content/news/:id/edit', name: 'news-edit', component: () => import('@/views/content/NewsEditView.vue'), meta: { title: '编辑资讯', roles: ['admin', 'editor'], hidden: true, permission: 'content:news:edit' } },
+      { path: 'content/banners', name: 'banners', component: () => import('@/views/content/BannerView.vue'), meta: { title: '轮播图管理', icon: 'Picture', roles: ['admin', 'editor'], permission: 'content:banner:manage' } },
+      { path: 'content/media', name: 'media', component: () => import('@/views/content/MediaView.vue'), meta: { title: '媒体素材', icon: 'FolderOpened', roles: ['admin', 'editor'], permission: 'content:media:manage' } },
+      { path: 'nutrition/foods', name: 'foods', component: () => import('@/views/nutrition/FoodView.vue'), meta: { title: '营养库管理', icon: 'Apple', roles: ['admin', 'editor'], permission: 'food:library:manage' } },
+      { path: 'users', name: 'users', component: () => import('@/views/users/UserListView.vue'), meta: { title: '用户管理', icon: 'User', roles: ['admin'], permission: 'user:manage' } },
+      { path: 'user-service/archives', name: 'archives', component: () => import('@/views/users/ArchiveView.vue'), meta: { title: '健康档案', icon: 'Files', roles: ['admin'], permission: 'health:archive:view' } },
+      { path: 'feedback', name: 'feedback', component: () => import('@/views/users/FeedbackView.vue'), meta: { title: '反馈管理', icon: 'ChatLineSquare', roles: ['admin', 'editor'], permission: 'feedback:manage' } },
+      { path: 'exports', name: 'exports', component: () => import('@/views/users/ExportView.vue'), meta: { title: '导出任务', icon: 'Download', roles: ['admin', 'editor'], permission: 'export:task:manage' } },
+      { path: 'system/roles', name: 'roles', component: () => import('@/views/system/RoleView.vue'), meta: { title: '角色权限', icon: 'Lock', roles: ['admin'], permission: 'system:role:manage' } },
+      { path: 'system/config', name: 'config', component: () => import('@/views/system/ConfigView.vue'), meta: { title: '系统参数', icon: 'Setting', roles: ['admin'], permission: 'system:config:manage' } },
+      { path: 'system/logs', name: 'logs', component: () => import('@/views/system/LogView.vue'), meta: { title: '操作日志', icon: 'Tickets', roles: ['admin'], permission: 'system:log:view' } },
+      { path: 'message/push', name: 'push', component: () => import('@/views/placeholder/PlaceholderView.vue'), meta: { title: '消息推送', icon: 'Bell', roles: ['admin'], placeholder: '消息推送（二期）', permission: 'message:push:manage' } },
+      { path: 'ai/config', name: 'ai-config', component: () => import('@/views/placeholder/PlaceholderView.vue'), meta: { title: 'AI 服务配置', icon: 'MagicStick', roles: ['admin'], placeholder: 'AI 服务配置（二期）', permission: 'ai:config:manage' } }
     ]
   },
   { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('@/views/error/NotFoundView.vue'), meta: { title: '404', hidden: true } }
@@ -55,6 +56,7 @@ export interface MenuChild {
   title: string
   icon?: string
   roles?: Role[]
+  permission?: string
 }
 export interface MenuGroup {
   title: string
@@ -64,36 +66,36 @@ export interface MenuGroup {
 }
 
 export const menuGroups: MenuGroup[] = [
-  { title: '概览', icon: 'DataBoard', roles: ['admin', 'editor'], children: [{ path: '/dashboard', title: '数据看板', icon: 'DataBoard' }] },
+  { title: '概览', icon: 'DataBoard', roles: ['admin', 'editor'], children: [{ path: '/dashboard', title: '数据看板', icon: 'DataBoard', permission: 'dashboard:view' }] },
   {
     title: '内容管理', icon: 'Document', roles: ['admin', 'editor'],
     children: [
-      { path: '/content/news', title: '资讯管理', icon: 'Document' },
-      { path: '/content/banners', title: '轮播图管理', icon: 'Picture' },
-      { path: '/content/media', title: '媒体素材', icon: 'FolderOpened' }
+      { path: '/content/news', title: '资讯管理', icon: 'Document', permission: 'content:news:list' },
+      { path: '/content/banners', title: '轮播图管理', icon: 'Picture', permission: 'content:banner:manage' },
+      { path: '/content/media', title: '媒体素材', icon: 'FolderOpened', permission: 'content:media:manage' }
     ]
   },
-  { title: '营养库', icon: 'Apple', roles: ['admin', 'editor'], children: [{ path: '/nutrition/foods', title: '食物条目与分类', icon: 'Apple' }] },
+  { title: '营养库', icon: 'Apple', roles: ['admin', 'editor'], children: [{ path: '/nutrition/foods', title: '食物条目与分类', icon: 'Apple', permission: 'food:library:manage' }] },
   {
     title: '用户与服务', icon: 'Service', roles: ['admin', 'editor'],
     children: [
-      { path: '/feedback', title: '反馈管理', icon: 'ChatLineSquare', roles: ['admin', 'editor'] },
-      { path: '/exports', title: '导出任务', icon: 'Download', roles: ['admin', 'editor'] },
-      { path: '/users', title: '用户管理', icon: 'User', roles: ['admin'] },
-      { path: '/user-service/archives', title: '健康档案', icon: 'Files', roles: ['admin'] }
+      { path: '/feedback', title: '反馈管理', icon: 'ChatLineSquare', roles: ['admin', 'editor'], permission: 'feedback:manage' },
+      { path: '/exports', title: '导出任务', icon: 'Download', roles: ['admin', 'editor'], permission: 'export:task:manage' },
+      { path: '/users', title: '用户管理', icon: 'User', roles: ['admin'], permission: 'user:manage' },
+      { path: '/user-service/archives', title: '健康档案', icon: 'Files', roles: ['admin'], permission: 'health:archive:view' }
     ]
   },
   {
     title: '系统管理', icon: 'Setting', roles: ['admin'],
     children: [
-      { path: '/system/roles', title: '角色权限', icon: 'Lock' },
-      { path: '/system/config', title: '系统参数', icon: 'Setting' },
-      { path: '/system/logs', title: '操作日志', icon: 'Tickets' }
+      { path: '/system/roles', title: '角色权限', icon: 'Lock', permission: 'system:role:manage' },
+      { path: '/system/config', title: '系统参数', icon: 'Setting', permission: 'system:config:manage' },
+      { path: '/system/logs', title: '操作日志', icon: 'Tickets', permission: 'system:log:view' }
     ]
   },
   { title: '二期占位', icon: 'Coin', roles: ['admin'], children: [
-    { path: '/message/push', title: '消息推送', icon: 'Bell' },
-    { path: '/ai/config', title: 'AI 服务配置', icon: 'MagicStick' }
+    { path: '/message/push', title: '消息推送', icon: 'Bell', permission: 'message:push:manage' },
+    { path: '/ai/config', title: 'AI 服务配置', icon: 'MagicStick', permission: 'ai:config:manage' }
   ] }
 ]
 
@@ -115,7 +117,10 @@ router.beforeEach((to) => {
     return { path: '/dashboard' }
   }
   const roles = to.meta.roles
-  if (roles && auth.account && !roles.includes(auth.account.role)) {
+  if (adminConfig.useMock && roles && auth.account && !roles.includes(auth.account.role)) {
+    return { path: '/dashboard' }
+  }
+  if (!adminConfig.useMock && to.meta.permission && !auth.hasPermission(to.meta.permission)) {
     return { path: '/dashboard' }
   }
   return true

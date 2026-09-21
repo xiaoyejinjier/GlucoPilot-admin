@@ -12,6 +12,10 @@ export interface AdminAccount {
   status: 1 | 0
   createdAt: string
   lastLoginAt: string
+  /** RuoYi 后端下发的角色与权限，仅用于前端可见性控制。 */
+  roles?: string[]
+  permissions?: string[]
+  menuPaths?: string[]
 }
 
 /* ------- C 端用户（后台被管对象） ------- */
