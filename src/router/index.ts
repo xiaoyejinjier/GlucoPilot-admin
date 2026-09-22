@@ -13,6 +13,8 @@ declare module 'vue-router' {
     permission?: string
     hidden?: boolean
     placeholder?: string
+    ruoyiResource?: string
+    ruoyiMonitor?: string
   }
 }
 
@@ -41,9 +43,23 @@ export const routes: RouteRecordRaw[] = [
       { path: 'user-service/archives', name: 'archives', component: () => import('@/views/users/ArchiveView.vue'), meta: { title: '健康档案', icon: 'Files', roles: ['admin'], permission: 'health:archive:view' } },
       { path: 'feedback', name: 'feedback', component: () => import('@/views/users/FeedbackView.vue'), meta: { title: '反馈管理', icon: 'ChatLineSquare', roles: ['admin', 'editor'], permission: 'feedback:manage' } },
       { path: 'exports', name: 'exports', component: () => import('@/views/users/ExportView.vue'), meta: { title: '导出任务', icon: 'Download', roles: ['admin', 'editor'], permission: 'export:task:manage' } },
-      { path: 'system/roles', name: 'roles', component: () => import('@/views/system/RoleView.vue'), meta: { title: '角色权限', icon: 'Lock', roles: ['admin'], permission: 'system:role:manage' } },
-      { path: 'system/config', name: 'config', component: () => import('@/views/system/ConfigView.vue'), meta: { title: '系统参数', icon: 'Setting', roles: ['admin'], permission: 'system:config:manage' } },
-      { path: 'system/logs', name: 'logs', component: () => import('@/views/system/LogView.vue'), meta: { title: '操作日志', icon: 'Tickets', roles: ['admin'], permission: 'system:log:view' } },
+      { path: 'system/users', name: 'system-users', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '用户管理', icon: 'User', roles: ['admin'], permission: 'system:user:manage', ruoyiResource: 'users' } },
+      { path: 'system/roles', name: 'roles', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '角色管理', icon: 'UserFilled', roles: ['admin'], permission: 'system:role:manage', ruoyiResource: 'roles' } },
+      { path: 'system/menus', name: 'system-menus', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '菜单管理', icon: 'Menu', roles: ['admin'], permission: 'system:menu:manage', ruoyiResource: 'menus' } },
+      { path: 'system/depts', name: 'system-depts', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '部门管理', icon: 'OfficeBuilding', roles: ['admin'], permission: 'system:dept:manage', ruoyiResource: 'depts' } },
+      { path: 'system/posts', name: 'system-posts', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '岗位管理', icon: 'Postcard', roles: ['admin'], permission: 'system:post:manage', ruoyiResource: 'posts' } },
+      { path: 'system/dict-types', name: 'system-dict-types', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '字典类型', icon: 'Collection', roles: ['admin'], permission: 'system:dict:manage', ruoyiResource: 'dict-types' } },
+      { path: 'system/dict-data', name: 'system-dict-data', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '字典数据', icon: 'CollectionTag', roles: ['admin'], permission: 'system:dict:manage', ruoyiResource: 'dict-data' } },
+      { path: 'system/config', name: 'config', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '系统参数', icon: 'Setting', roles: ['admin'], permission: 'system:config:manage', ruoyiResource: 'configs' } },
+      { path: 'system/notices', name: 'system-notices', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '通知公告', icon: 'Bell', roles: ['admin'], permission: 'system:notice:manage', ruoyiResource: 'notices' } },
+      { path: 'monitor/online', name: 'monitor-online', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '在线用户', icon: 'User', roles: ['admin'], permission: 'monitor:online:list', ruoyiMonitor: 'online' } },
+      { path: 'monitor/login-logs', name: 'monitor-login-logs', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '登录日志', icon: 'Tickets', roles: ['admin'], permission: 'monitor:logininfor:list', ruoyiMonitor: 'login-logs' } },
+      { path: 'monitor/oper-logs', name: 'monitor-oper-logs', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '操作日志', icon: 'Document', roles: ['admin'], permission: 'monitor:operlog:list', ruoyiMonitor: 'oper-logs' } },
+      { path: 'monitor/server', name: 'monitor-server', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '服务监控', icon: 'Cpu', roles: ['admin'], permission: 'monitor:server:list', ruoyiMonitor: 'server' } },
+      { path: 'monitor/cache', name: 'monitor-cache', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '缓存监控', icon: 'Coin', roles: ['admin'], permission: 'monitor:cache:manage', ruoyiMonitor: 'cache' } },
+      { path: 'monitor/jobs', name: 'monitor-jobs', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '定时任务', icon: 'Clock', roles: ['admin'], permission: 'monitor:job:manage', ruoyiResource: 'jobs' } },
+      { path: 'monitor/job-logs', name: 'monitor-job-logs', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '任务日志', icon: 'List', roles: ['admin'], permission: 'monitor:job:manage', ruoyiMonitor: 'job-logs' } },
+      { path: 'tool/generator', name: 'tool-generator', component: () => import('@/views/system/RuoYiGeneratorView.vue'), meta: { title: '代码生成', icon: 'DocumentAdd', roles: ['admin'], permission: 'tool:gen:manage' } },
       { path: 'message/push', name: 'push', component: () => import('@/views/placeholder/PlaceholderView.vue'), meta: { title: '消息推送', icon: 'Bell', roles: ['admin'], placeholder: '消息推送（二期）', permission: 'message:push:manage' } },
       { path: 'ai/config', name: 'ai-config', component: () => import('@/views/placeholder/PlaceholderView.vue'), meta: { title: 'AI 服务配置', icon: 'MagicStick', roles: ['admin'], placeholder: 'AI 服务配置（二期）', permission: 'ai:config:manage' } }
     ]
@@ -88,11 +104,30 @@ export const menuGroups: MenuGroup[] = [
   {
     title: '系统管理', icon: 'Setting', roles: ['admin'],
     children: [
-      { path: '/system/roles', title: '角色权限', icon: 'Lock', permission: 'system:role:manage' },
+      { path: '/system/users', title: '用户管理', icon: 'User', permission: 'system:user:manage' },
+      { path: '/system/roles', title: '角色管理', icon: 'UserFilled', permission: 'system:role:manage' },
+      { path: '/system/menus', title: '菜单管理', icon: 'Menu', permission: 'system:menu:manage' },
+      { path: '/system/depts', title: '部门管理', icon: 'OfficeBuilding', permission: 'system:dept:manage' },
+      { path: '/system/posts', title: '岗位管理', icon: 'Postcard', permission: 'system:post:manage' },
+      { path: '/system/dict-types', title: '字典类型', icon: 'Collection', permission: 'system:dict:manage' },
+      { path: '/system/dict-data', title: '字典数据', icon: 'CollectionTag', permission: 'system:dict:manage' },
       { path: '/system/config', title: '系统参数', icon: 'Setting', permission: 'system:config:manage' },
-      { path: '/system/logs', title: '操作日志', icon: 'Tickets', permission: 'system:log:view' }
+      { path: '/system/notices', title: '通知公告', icon: 'Bell', permission: 'system:notice:manage' }
     ]
   },
+  {
+    title: '系统监控', icon: 'Monitor', roles: ['admin'],
+    children: [
+      { path: '/monitor/online', title: '在线用户', icon: 'User', permission: 'monitor:online:list' },
+      { path: '/monitor/login-logs', title: '登录日志', icon: 'Tickets', permission: 'monitor:logininfor:list' },
+      { path: '/monitor/oper-logs', title: '操作日志', icon: 'Document', permission: 'monitor:operlog:list' },
+      { path: '/monitor/server', title: '服务监控', icon: 'Cpu', permission: 'monitor:server:list' },
+      { path: '/monitor/cache', title: '缓存监控', icon: 'Coin', permission: 'monitor:cache:manage' },
+      { path: '/monitor/jobs', title: '定时任务', icon: 'Clock', permission: 'monitor:job:manage' },
+      { path: '/monitor/job-logs', title: '任务日志', icon: 'List', permission: 'monitor:job:manage' }
+    ]
+  },
+  { title: '系统工具', icon: 'Tools', roles: ['admin'], children: [{ path: '/tool/generator', title: '代码生成', icon: 'DocumentAdd', permission: 'tool:gen:manage' }] },
   { title: '二期占位', icon: 'Coin', roles: ['admin'], children: [
     { path: '/message/push', title: '消息推送', icon: 'Bell', permission: 'message:push:manage' },
     { path: '/ai/config', title: 'AI 服务配置', icon: 'MagicStick', permission: 'ai:config:manage' }

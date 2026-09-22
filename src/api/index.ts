@@ -201,4 +201,50 @@ export const api = adminConfig.useMock
       ...remote
     } as typeof mockApi)
 
+/** 完整若依管理模块只使用真实后端；Mock 模式会明确提示，避免演示数据被误当成权限配置。 */
+export type RuoYiRow = Record<string, unknown> & { id: number | string }
+
+function requireRemote() {
+  if (adminConfig.useMock) throw new Error('若依系统管理需要连接后端，请将 VITE_USE_MOCK 关闭后重试')
+}
+
+export const ruoyiApi = {
+  async list<T = RuoYiRow>(resource: string): Promise<T[]> {
+    requireRemote()
+    return get<T[]>(`/admin/v1/ruoyi/${resource}`)
+  },
+  async create<T = RuoYiRow>(resource: string, data: unknown): Promise<T> {
+    requireRemote()
+    return post<T>(`/admin/v1/ruoyi/${resource}`, data)
+  },
+  async getOne<T = Record<string, unknown>>(resource: string): Promise<T> {
+    requireRemote()
+    return get<T>(`/admin/v1/ruoyi/${resource}`)
+  },
+  async update<T = RuoYiRow>(resource: string, id: number | string, data: unknown): Promise<T> {
+    requireRemote()
+    return put<T>(`/admin/v1/ruoyi/${resource}/${id}`, data)
+  },
+  async remove(resource: string, id: number | string): Promise<void> {
+    requireRemote()
+    await del(`/admin/v1/ruoyi/${resource}/${id}`)
+  },
+  async runJob(id: number | string): Promise<void> {
+    requireRemote()
+    await post(`/admin/v1/ruoyi/jobs/${id}/run`)
+  },
+  async generatorTables() {
+    requireRemote()
+    return get<RuoYiRow[]>('/admin/v1/ruoyi/generator/tables')
+  },
+  async syncGeneratorTable(name: string) {
+    requireRemote()
+    return post<Record<string, unknown>>(`/admin/v1/ruoyi/generator/tables/${encodeURIComponent(name)}/sync`)
+  },
+  async previewGeneratorTable(id: number | string) {
+    requireRemote()
+    return get<Record<string, unknown>>(`/admin/v1/ruoyi/generator/tables/${id}/preview`)
+  }
+}
+
 export { resetDb } from '@/mock'
