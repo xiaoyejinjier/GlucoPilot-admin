@@ -42,7 +42,15 @@
           <el-table :data="filtered" v-loading="loading">
             <el-table-column label="食物" min-width="180">
               <template #default="{ row }">
-                <div class="food-cell"><img :src="row.image" class="food-img" /><span>{{ row.name }}</span></div>
+                <div class="food-cell">
+                  <img
+                    :src="resolveFoodImage(row)"
+                    :alt="`${row.name}图片`"
+                    class="food-img"
+                    @error="useFallbackImage($event, row)"
+                  />
+                  <span>{{ row.name }}</span>
+                </div>
               </template>
             </el-table-column>
             <el-table-column prop="categoryName" label="分类" width="100" />
@@ -91,7 +99,7 @@
       <el-form label-width="90px">
         <el-form-item label="名称"><el-input v-model="foodDialog.form.name" /></el-form-item>
         <el-form-item label="分类">
-          <el-select v-model="foodDialog.form.categoryId" style="width: 100%">
+          <el-select v-model="foodDialog.form.categoryId" style="width: 100%" @change="onFoodCategoryChange">
             <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
         </el-form-item>
@@ -99,9 +107,17 @@
         <el-form-item label="热量 kcal"><el-input-number v-model="foodDialog.form.cal" :min="0" :precision="0" /></el-form-item>
         <el-form-item label="GI 值"><el-input-number v-model="foodDialog.form.gi" :min="0" :max="120" :step="1" placeholder="可空" /></el-form-item>
         <el-form-item label="图片">
-          <el-select v-model="foodDialog.form.image" style="width: 100%">
-            <el-option v-for="i in 10" :key="i" :label="`食物图 ${i}`" :value="`/img/food-${i}.svg`" />
-          </el-select>
+          <div class="food-image-picker">
+            <img :src="resolveFoodImage(foodDialog.form)" class="food-preview" alt="食物图片预览" />
+            <el-select v-model="foodDialog.form.image" filterable style="width: 100%" placeholder="选择内置食物图片">
+              <el-option v-for="option in FOOD_IMAGE_OPTIONS" :key="option.value" :label="option.label" :value="option.value">
+                <div class="image-option">
+                  <img :src="option.value" :alt="option.label" />
+                  <span>{{ option.label }}</span>
+                </div>
+              </el-option>
+            </el-select>
+          </div>
         </el-form-item>
         <el-form-item label="说明"><el-input v-model="foodDialog.form.description" /></el-form-item>
         <el-form-item label="启用"><el-switch v-model="foodDialog.form.enabled" /></el-form-item>
@@ -133,6 +149,12 @@ import { Delete, Download, Edit, Plus, Search, Upload } from '@element-plus/icon
 import { api } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import type { FoodCategory, FoodItem } from '@/types'
+import {
+  DEFAULT_FOOD_IMAGE,
+  FOOD_IMAGE_OPTIONS,
+  getBundledFoodImage,
+  resolveFoodImage
+} from './foodImages'
 
 const auth = useAuthStore()
 const loading = ref(false)
@@ -146,7 +168,7 @@ const foodDialog = reactive({
   visible: false,
   form: {
     id: 0, name: '', categoryId: 1, categoryName: '', carbs: 0, cal: 0, gi: null as number | null,
-    image: '/img/food-rice.svg', description: '', enabled: true, updatedAt: ''
+    image: DEFAULT_FOOD_IMAGE, description: '', enabled: true, updatedAt: ''
   }
 })
 const importVisible = ref(false)
@@ -197,14 +219,24 @@ async function removeCategory(c: FoodCategory) {
 
 function openFood(f?: FoodItem) {
   if (f) {
-    foodDialog.form = { ...f }
+    foodDialog.form = { ...f, image: resolveFoodImage(f) }
   } else {
-    foodDialog.form = { id: 0, name: '', categoryId: categories.value[0]?.id || 1, categoryName: '', carbs: 0, cal: 0, gi: null, image: '/img/food-rice.svg', description: '', enabled: true, updatedAt: '' }
+    const category = categories.value.find((item) => item.id === filterCategory.value) || categories.value[0]
+    foodDialog.form = {
+      id: 0, name: '', categoryId: category?.id || 1, categoryName: category?.name || '',
+      carbs: 0, cal: 0, gi: null, image: getBundledFoodImage('', category?.name),
+      description: '', enabled: true, updatedAt: ''
+    }
   }
   foodDialog.visible = true
 }
 async function saveFood() {
   if (!foodDialog.form.name.trim()) return ElMessage.warning('请输入食物名称')
+  foodDialog.form.categoryId = Number(foodDialog.form.categoryId)
+  foodDialog.form.categoryName = categories.value.find((c) => c.id === foodDialog.form.categoryId)?.name || ''
+  if (!foodDialog.form.image) {
+    foodDialog.form.image = getBundledFoodImage(foodDialog.form.name, foodDialog.form.categoryName)
+  }
   const saved = await api.saveFood({ ...foodDialog.form } as FoodItem)
   if (auth.account) api.writeLog(auth.account.username, auth.account.role, '营养库', foodDialog.form.id ? '编辑食物' : '新增食物', saved.name)
   foodDialog.visible = false
@@ -215,6 +247,21 @@ async function removeFood(f: FoodItem) {
   await api.removeFood(f.id)
   ElMessage.success('已删除')
   await load()
+}
+
+function onFoodCategoryChange(categoryId: number | string) {
+  const category = categories.value.find((item) => item.id === Number(categoryId))
+  foodDialog.form.categoryId = Number(categoryId)
+  foodDialog.form.categoryName = category?.name || ''
+  if (!foodDialog.form.id) {
+    foodDialog.form.image = getBundledFoodImage(foodDialog.form.name, category?.name)
+  }
+}
+
+function useFallbackImage(event: Event, food: FoodItem) {
+  const image = event.target as HTMLImageElement
+  const fallback = getBundledFoodImage(food.name, food.categoryName)
+  if (!image.src.endsWith(fallback)) image.src = fallback
 }
 async function toggle(f: FoodItem, enabled: boolean) {
   try {
@@ -247,7 +294,7 @@ async function doImport() {
     await api.saveFood({
       id: 0, name: parts[0], categoryId: cat.id, categoryName: cat.name,
       carbs: Number(parts[2] || 0), cal: Number(parts[3] || 0), gi: parts[4] ? Number(parts[4]) : null,
-      image: '/img/food-rice.svg', description: '', enabled: true, updatedAt: ''
+      image: getBundledFoodImage(parts[0], cat.name), description: '', enabled: true, updatedAt: ''
     })
     ok++
   }
@@ -272,4 +319,8 @@ async function doImport() {
 .filter { display: flex; justify-content: space-between; align-items: center; }
 .food-cell { display: flex; align-items: center; gap: 8px; }
 .food-img { width: 34px; height: 34px; object-fit: cover; border-radius: 6px; background: #f7f7f7; border: 1px solid var(--kt-line); }
+.food-image-picker { display: flex; align-items: center; gap: 12px; width: 100%; }
+.food-preview { width: 58px; height: 58px; flex: 0 0 auto; object-fit: cover; border-radius: 8px; border: 1px solid var(--kt-line); background: #f7f7f7; }
+.image-option { display: flex; align-items: center; gap: 10px; }
+.image-option img { width: 28px; height: 28px; object-fit: cover; border-radius: 5px; }
 </style>

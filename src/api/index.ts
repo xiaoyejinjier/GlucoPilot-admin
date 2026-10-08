@@ -176,7 +176,7 @@ const remote = {
   async saveFood(f: FoodItem) {
     const body = {
       name: f.name,
-      categoryId: f.categoryId,
+      categoryId: Number(f.categoryId),
       carbs: f.carbs,
       cal: f.cal,
       gi: f.gi,
