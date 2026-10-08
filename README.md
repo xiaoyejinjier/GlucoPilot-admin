@@ -2,6 +2,8 @@
 
 PC 端管理后台（Vue3 + TypeScript + Vite + Pinia + Element Plus + ECharts）。
 
+本机联调可直接双击 `..\scripts\start-admin.cmd`。脚本会检查 Node/npm、首次自动安装依赖、检测后端 8080，并启动管理端后打开浏览器。
+
 ## 联调（当前）
 
 已对接后端 `/admin/v1`：
@@ -11,8 +13,9 @@ PC 端管理后台（Vue3 + TypeScript + Vite + Pinia + Element Plus + ECharts�
 | 登录 | `POST /admin/v1/auth/sessions` |
 | 资讯 / Banner | 列表、保存、删除、资讯状态 |
 | 营养库 | 分类与食物 CRUD |
+| C 端用户 | 真实数据库用户列表、禁用与解禁 |
 
-看板、用户、反馈、媒体、系统配置等仍用 `src/mock`（`config.useMock=false` 时仅上述模块走真实接口）。
+反馈管理已接入真实 `/admin/v1/feedbacks` 查询与审批回复接口。用户管理已接入真实 `/admin/v1/users`，数据来自 `user_account` 及其关联表。看板、媒体、导出等未完成接口仍使用 `src/mock`。
 
 ```bash
 # 1. 后端已启动 :8080（Flyway V3 含联调账号；见 backend/sql/README.md）

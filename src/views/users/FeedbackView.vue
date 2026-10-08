@@ -36,13 +36,13 @@
         <el-table-column prop="createdAt" label="提交时间" width="160" />
         <el-table-column label="操作" width="140" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openHandle(row)">处理</el-button>
+            <el-button link type="primary" @click="openHandle(row)">审批/回复</el-button>
           </template>
         </el-table-column>
       </el-table>
     </div>
 
-    <el-dialog v-model="dialog.visible" :title="`处理反馈 #${dialog.row?.id}`" width="560px">
+    <el-dialog v-model="dialog.visible" :title="`审批反馈 #${dialog.row?.id}`" width="560px">
       <template v-if="dialog.row">
         <div class="kt-card mb12" style="background: #fafafa">
           <div class="text-muted" style="font-size: 13px">{{ dialog.row.userName }} · {{ dialog.row.type }} · {{ dialog.row.createdAt }}</div>
@@ -64,7 +64,7 @@
       </template>
       <template #footer>
         <el-button @click="dialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="saveReply">提交处理</el-button>
+        <el-button type="primary" :loading="saving" @click="saveReply">提交审批</el-button>
       </template>
     </el-dialog>
   </div>
@@ -79,7 +79,7 @@ import { useAuthStore } from '@/stores/auth'
 import type { Feedback, FeedbackStatus, FeedbackType } from '@/types'
 
 const auth = useAuthStore()
-const types: FeedbackType[] = ['产品建议', '功能异常', '内容问题', '其他']
+const types: FeedbackType[] = ['产品建议', 'Bug问题', '功能诉求', '其他']
 const loading = ref(false)
 const saving = ref(false)
 const list = ref<Feedback[]>([])
@@ -89,8 +89,13 @@ const form = reactive({ status: 'received' as FeedbackStatus, reply: '' })
 
 async function load() {
   loading.value = true
-  list.value = await api.listFeedback()
-  loading.value = false
+  try {
+    list.value = await api.listFeedback()
+  } catch (error) {
+    ElMessage.error((error as Error).message || '反馈加载失败')
+  } finally {
+    loading.value = false
+  }
 }
 onMounted(load)
 
@@ -119,13 +124,22 @@ function openHandle(row: Feedback) {
 
 async function saveReply() {
   if (!dialog.row) return
+  if (form.status === 'done' && !form.reply.trim()) {
+    ElMessage.warning('标记已完成时必须填写给用户的回复')
+    return
+  }
   saving.value = true
-  await api.replyFeedback(dialog.row.id, form.reply, form.status)
-  if (auth.account) api.writeLog(auth.account.username, auth.account.role, '反馈', '处理反馈', `#${dialog.row.id} → ${statusText(form.status)}`)
-  saving.value = false
-  dialog.visible = false
-  ElMessage.success('已提交')
-  await load()
+  try {
+    await api.replyFeedback(dialog.row.id, form.reply, form.status)
+    if (auth.account) api.writeLog(auth.account.username, auth.account.role, '反馈', '处理反馈', `#${dialog.row.id} → ${statusText(form.status)}`)
+    dialog.visible = false
+    ElMessage.success('审批结果已回写，用户端可在“我的反馈”查看')
+    await load()
+  } catch (error) {
+    ElMessage.error((error as Error).message || '审批提交失败')
+  } finally {
+    saving.value = false
+  }
 }
 </script>
 

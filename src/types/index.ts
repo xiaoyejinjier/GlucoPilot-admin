@@ -21,6 +21,7 @@ export interface AdminAccount {
 /* ------- C 端用户（后台被管对象） ------- */
 export interface AppUser {
   id: number
+  username: string
   nickname: string
   avatarText: string
   phone: string
@@ -120,7 +121,7 @@ export interface FoodItem {
 }
 
 /* ------- 反馈 ------- */
-export type FeedbackType = '产品建议' | '功能异常' | '内容问题' | '其他'
+export type FeedbackType = '产品建议' | 'Bug问题' | '功能诉求' | '其他'
 export type FeedbackStatus = 'received' | 'processing' | 'done'
 
 export interface Feedback {

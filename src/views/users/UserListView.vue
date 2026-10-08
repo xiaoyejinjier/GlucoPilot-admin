@@ -7,7 +7,7 @@
 
     <div class="kt-card">
       <div class="filter mb12">
-        <el-input v-model="q.keyword" placeholder="昵称 / 手机号" clearable :prefix-icon="Search" style="width: 240px" />
+        <el-input v-model="q.keyword" placeholder="用户名 / 昵称 / 手机号" clearable :prefix-icon="Search" style="width: 260px" />
         <el-select v-model="q.status" placeholder="状态" clearable style="width: 130px">
           <el-option label="正常" value="enabled" />
           <el-option label="已禁用" value="disabled" />
@@ -26,6 +26,7 @@
             </div>
           </template>
         </el-table-column>
+        <el-table-column prop="username" label="用户名" min-width="150" />
         <el-table-column prop="age" label="年龄" width="70" />
         <el-table-column prop="diabetesType" label="类型" width="130" />
         <el-table-column label="记录" width="140">
@@ -70,24 +71,34 @@ const q = reactive({ keyword: '', status: '' })
 
 async function load() {
   loading.value = true
-  users.value = await api.listUsers()
-  loading.value = false
+  try {
+    users.value = await api.listUsers()
+  } catch (error) {
+    users.value = []
+    ElMessage.error(error instanceof Error ? error.message : '用户列表加载失败')
+  } finally {
+    loading.value = false
+  }
 }
 onMounted(load)
 
 const userRows = computed(() =>
   users.value.filter(
     (u) =>
-      (!q.keyword || u.nickname.includes(q.keyword) || u.phone.includes(q.keyword)) &&
+      (!q.keyword || (u.username || '').includes(q.keyword) || u.nickname.includes(q.keyword) || u.phone.includes(q.keyword)) &&
       (!q.status || u.status === q.status)
   )
 )
 
 async function toggle(row: AppUser, enabled: boolean) {
-  await api.toggleUserStatus(row.id, enabled)
-  if (auth.account) api.writeLog(auth.account.username, auth.account.role, '用户', enabled ? '解禁用户' : '禁用用户', `${row.nickname}(${row.id})`)
-  ElMessage.success(enabled ? '已解禁' : '已禁用')
-  await load()
+  try {
+    await api.toggleUserStatus(row.id, enabled)
+    if (auth.account) api.writeLog(auth.account.username, auth.account.role, '用户', enabled ? '解禁用户' : '禁用用户', `${row.nickname}(${row.id})`)
+    ElMessage.success(enabled ? '已解禁' : '已禁用')
+    await load()
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '用户状态更新失败')
+  }
 }
 </script>
 

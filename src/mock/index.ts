@@ -45,6 +45,7 @@ function seed(): DBShape {
     const n = i % names.length
     return {
       id,
+      username: `user_${1000 + i}`,
       nickname: i < 10 ? names[n] : `糖友${1000 + i}`,
       avatarText: (names[n] || '友').slice(0, 1),
       phone: `138${d2(i)}${String(1000 + i * 7).slice(0, 6)}`,
@@ -121,8 +122,8 @@ function seed(): DBShape {
 
   const feedback: Feedback[] = [
     { id: 1, userId: 3, userName: '陈师傅', type: '产品建议', content: '希望拍照估糖能区分“饭量大小”，我吃半碗和一碗估算应该不一样。', contact: '', status: 'received', reply: '', createdAt: '2026-09-19 09:12', processedAt: '' },
-    { id: 2, userId: 6, userName: '刘姐', type: '功能异常', content: '九节点页面早餐后的图标点击没有反应，麻烦看下。', contact: '13800000006', status: 'processing', reply: '已复现，正在修复该节点跳转问题。', createdAt: '2026-09-18 20:03', processedAt: '2026-09-19 10:00' },
-    { id: 3, userId: 12, userName: '糖友1011', type: '内容问题', content: '控糖科普那篇文章里“杂粮饭”配图看起来像白米饭。', contact: '', status: 'done', reply: '已核对并替换配图，感谢指正！', createdAt: '2026-09-15 11:40', processedAt: '2026-09-16 09:30' },
+    { id: 2, userId: 6, userName: '刘姐', type: 'Bug问题', content: '九节点页面早餐后的图标点击没有反应，麻烦看下。', contact: '13800000006', status: 'processing', reply: '已复现，正在修复该节点跳转问题。', createdAt: '2026-09-18 20:03', processedAt: '2026-09-19 10:00' },
+    { id: 3, userId: 12, userName: '糖友1011', type: '功能诉求', content: '希望增加更丰富的控糖科普内容。', contact: '', status: 'done', reply: '已收录需求，感谢建议！', createdAt: '2026-09-15 11:40', processedAt: '2026-09-16 09:30' },
     { id: 4, userId: 8, userName: '孙女士', type: '其他', content: '导出数据的 Excel 里日期列格式有点乱。', contact: '13800000008', status: 'received', reply: '', createdAt: '2026-09-20 08:22', processedAt: '' }
   ]
 
@@ -168,7 +169,13 @@ function load(): DBShape {
     const raw = localStorage.getItem(DB_KEY)
     if (raw) {
       const saved = JSON.parse(raw) as DBShape
-      return { ...seed(), ...saved }
+      const merged = { ...seed(), ...saved }
+      // 兼容新增 username 之前已经保存在浏览器里的旧 Mock 数据。
+      merged.users = (merged.users || []).map((user) => ({
+        ...user,
+        username: user.username || `user_${user.id}`
+      }))
+      return merged
     }
   } catch {
     /* ignore */

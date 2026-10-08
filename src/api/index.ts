@@ -1,15 +1,68 @@
 import type {
-  AdminAccount, Banner, FoodCategory, FoodItem, News, Role
+  AdminAccount, AppUser, Banner, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem, News, Role
 } from '@/types'
 import { api as mockApi } from '@/mock'
 import { adminConfig } from '@/config'
 import { del, get, post, put, setAccessToken } from '@/utils/request'
+import { fmtTime } from '@/utils/format'
 
 function numId<T extends { id?: number | string }>(row: T): T & { id: number } {
   return { ...row, id: Number(row.id) }
 }
 
-/** 真实后端 API（登录 + CMS + 营养库 + 运营账号）；其余仍走 Mock */
+interface AdminFeedbackRow {
+  id: string
+  userId: string
+  userName: string
+  contact?: string | null
+  feedbackType: number
+  contentText: string
+  replyStatus: number
+  officialReply?: string | null
+  createdAt: string
+  repliedAt?: string | null
+}
+
+interface PageData<T> {
+  records: T[]
+}
+
+interface AdminUserRow {
+  id: string
+  username: string
+  nickname: string
+  avatarText?: string | null
+  phoneMasked?: string | null
+  age?: number | null
+  diabetesTypeText?: string | null
+  accountStatus: number
+  registeredAt?: string | null
+  lastActiveAt?: string | null
+  recordCount: number
+  mealCount: number
+  complianceRate: number
+}
+
+const feedbackTypes: Record<number, FeedbackType> = {
+  1: '产品建议',
+  2: 'Bug问题',
+  3: '功能诉求',
+  4: '其他'
+}
+
+function feedbackStatus(code: number): FeedbackStatus {
+  if (code === 1) return 'processing'
+  if (code === 2 || code === 3) return 'done'
+  return 'received'
+}
+
+function feedbackStatusCode(status: FeedbackStatus): number {
+  if (status === 'processing') return 1
+  if (status === 'done') return 2
+  return 0
+}
+
+/** 真实后端 API（登录 + CMS + 营养库 + 运营账号 + 反馈闭环）；其余仍走 Mock */
 const remote = {
   async login(username: string, password: string) {
     const data = await post<{
@@ -148,6 +201,50 @@ const remote = {
   },
   async removeFood(id: number) {
     await del(`/admin/v1/foods/${id}`)
+  },
+
+  async listUsers() {
+    const page = await get<PageData<AdminUserRow>>('/admin/v1/users?pageNum=1&pageSize=100')
+    return (page.records || []).map((row) => ({
+      id: Number(row.id),
+      username: row.username || `user_${row.id}`,
+      nickname: row.nickname || `用户#${row.id}`,
+      avatarText: row.avatarText || (row.nickname ? row.nickname.slice(0, 1) : '用'),
+      phone: row.phoneMasked || '未绑定',
+      age: Number(row.age) || 0,
+      diabetesType: row.diabetesTypeText || '未填写',
+      status: Number(row.accountStatus) === 1 ? 'enabled' : 'disabled',
+      registeredAt: row.registeredAt ? fmtTime(row.registeredAt) : '',
+      lastActiveAt: row.lastActiveAt ? fmtTime(row.lastActiveAt) : '',
+      recordCount: Number(row.recordCount) || 0,
+      mealCount: Number(row.mealCount) || 0,
+      compliance: Number(row.complianceRate) || 0
+    }) as AppUser)
+  },
+  async toggleUserStatus(id: number, enabled: boolean) {
+    await put(`/admin/v1/users/${id}/status`, { accountStatus: enabled ? 1 : 0 })
+  },
+
+  async listFeedback() {
+    const page = await get<PageData<AdminFeedbackRow>>('/admin/v1/feedbacks?pageNum=1&pageSize=100')
+    return (page.records || []).map((row) => ({
+      id: Number(row.id),
+      userId: Number(row.userId),
+      userName: row.userName || `用户#${row.userId}`,
+      type: feedbackTypes[row.feedbackType] || '其他',
+      content: row.contentText || '',
+      contact: row.contact || '',
+      status: feedbackStatus(Number(row.replyStatus)),
+      reply: row.officialReply || '',
+      createdAt: fmtTime(row.createdAt),
+      processedAt: row.repliedAt ? fmtTime(row.repliedAt) : ''
+    }) as Feedback)
+  },
+  async replyFeedback(id: number, reply: string, status: FeedbackStatus) {
+    await put(`/admin/v1/feedbacks/${id}/reply`, {
+      replyStatus: feedbackStatusCode(status),
+      officialReply: reply.trim()
+    })
   },
 
   async listAccounts() {
