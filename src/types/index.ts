@@ -45,7 +45,14 @@ export interface ArchiveNodeStat {
 export interface HealthArchive {
   userId: number
   owner: { nickname: string; phone: string; age: number; diabetesType: string; registeredAt: string }
-  profile: { height: number; weight: number; medication: string; exercise: string; diagnosedAt: string }
+  /** height / weight 后端暂无可取列，返回 null（待补） */
+  profile: {
+    height: number | null
+    weight: number | null
+    medication: string
+    exercise: string
+    diagnosedAt: string
+  }
   trend: Array<{ date: string; avg: number; okRate: number }>
   nodeStats: ArchiveNodeStat[]
   mealSummary: { recordDays: number; avgCarbsG: number; avgCal: number; topFoods: string[] }

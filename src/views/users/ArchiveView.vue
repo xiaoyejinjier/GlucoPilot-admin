@@ -100,8 +100,8 @@
                 <div class="kt-card">
                   <div class="block-title">基础资料</div>
                   <el-descriptions :column="1" size="small" border>
-                    <el-descriptions-item label="身高">{{ archive.profile.height }} cm</el-descriptions-item>
-                    <el-descriptions-item label="体重">{{ archive.profile.weight }} kg</el-descriptions-item>
+                    <el-descriptions-item label="身高">{{ archive.profile.height == null ? '—' : `${archive.profile.height} cm` }}</el-descriptions-item>
+                    <el-descriptions-item label="体重">{{ archive.profile.weight == null ? '—' : `${archive.profile.weight} kg` }}</el-descriptions-item>
                     <el-descriptions-item label="确诊时间">{{ archive.profile.diagnosedAt }}</el-descriptions-item>
                     <el-descriptions-item label="用药">{{ archive.profile.medication }}</el-descriptions-item>
                     <el-descriptions-item label="运动">{{ archive.profile.exercise }}</el-descriptions-item>
@@ -186,9 +186,14 @@ async function select(u: AppUser) {
   selected.value = u
   archive.value = null
   archLoading.value = true
-  archive.value = await api.archiveOf(u.id)
-  if (auth.account) api.writeLog(auth.account.username, auth.account.role, '档案', '查看健康档案', `${u.nickname}(${u.id})`)
-  archLoading.value = false
+  try {
+    archive.value = await api.archiveOf(u.id)
+    if (auth.account) api.writeLog(auth.account.username, auth.account.role, '档案', '查看健康档案', `${u.nickname}(${u.id})`)
+  } catch (e) {
+    ElMessage.error((e as Error).message || '健康档案加载失败')
+  } finally {
+    archLoading.value = false
+  }
 }
 
 const avg7 = computed(() => {

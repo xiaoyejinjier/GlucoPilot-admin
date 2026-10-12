@@ -1,5 +1,5 @@
 import type {
-  AdminAccount, AppUser, Banner, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem, News, Role
+  AdminAccount, AppUser, Banner, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem, HealthArchive, News, Role
 } from '@/types'
 import { api as mockApi } from '@/mock'
 import { adminConfig } from '@/config'
@@ -223,6 +223,70 @@ const remote = {
   },
   async toggleUserStatus(id: number, enabled: boolean) {
     await put(`/admin/v1/users/${id}/status`, { accountStatus: enabled ? 1 : 0 })
+  },
+  async archiveOf(userId: number) {
+    const a = await get<{
+      userId: string
+      owner: {
+        nickname: string
+        phoneMasked?: string | null
+        age?: number | null
+        diabetesTypeText?: string | null
+        registeredAt?: string | null
+      }
+      profile: {
+        height?: number | null
+        weight?: number | null
+        medication?: string | null
+        exerciseHabit?: string | null
+        diagnosedYm?: string | null
+      }
+      trend: Array<{ date: string; avg: number | null; okRate: number | null }>
+      nodeStats: Array<{ node: string; nodeName: string; avg: number | null; samples: number | null }>
+      mealSummary?: {
+        recordDays?: number | null
+        avgCarbsG?: number | null
+        avgCal?: number | null
+        topFoods?: string[] | null
+      } | null
+      summary?: string | null
+    }>(`/admin/v1/users/${userId}/archive`)
+    return {
+      userId: Number(a.userId),
+      owner: {
+        nickname: a.owner.nickname,
+        phone: a.owner.phoneMasked || '',
+        age: a.owner.age ?? 0,
+        diabetesType: a.owner.diabetesTypeText || '未填写',
+        registeredAt: a.owner.registeredAt ? fmtTime(a.owner.registeredAt) : ''
+      },
+      profile: {
+        height: a.profile.height ?? null,
+        weight: a.profile.weight ?? null,
+        medication: a.profile.medication || '未填写',
+        exercise: a.profile.exerciseHabit || '未填写',
+        diagnosedAt: a.profile.diagnosedYm || '未填写'
+      },
+      trend: (a.trend || []).map((t) => ({
+        date: t.date,
+        avg: Number(t.avg) || 0,
+        okRate: Number(t.okRate) || 0
+      })),
+      nodeStats: (a.nodeStats || []).map((n) => ({
+        node: n.node,
+        nodeName: n.nodeName,
+        avg: Number(n.avg) || 0,
+        samples: Number(n.samples) || 0
+      })),
+      mealSummary: {
+        recordDays: Number(a.mealSummary?.recordDays) || 0,
+        avgCarbsG: Number(a.mealSummary?.avgCarbsG) || 0,
+        avgCal: Number(a.mealSummary?.avgCal) || 0,
+        topFoods: a.mealSummary?.topFoods || []
+      },
+      // 后端暂无 AI 小结数据源（TODO）；此处仅占位提示，避免展示 Mock 文案
+      summary: a.summary || '暂未生成 AI 档案小结，后续接入后自动展示。'
+    } as HealthArchive
   },
 
   async listFeedback() {
