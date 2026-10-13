@@ -1,0 +1,13 @@
+name: glucopilot-admin
+services:
+  gateway:
+    image: ${ADMIN_IMAGE:?Set ADMIN_IMAGE to an accepted immutable image tag}
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    networks:
+      - shared
+networks:
+  shared:
+    external: true
+    name: glucopilot-shared

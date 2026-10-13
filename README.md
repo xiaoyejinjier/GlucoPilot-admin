@@ -40,3 +40,9 @@ npm install
 npm run dev
 npm run build
 ```
+
+
+## 独立仓库
+
+当前目录就是构建根目录，Docker 构建使用 `docker build -t glucopilot-admin:accepted-tag .`。
+独立部署步骤见 [DEPLOYMENT.md](DEPLOYMENT.md)。

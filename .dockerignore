@@ -4,3 +4,8 @@ dist
 .env
 *.log
 README.md
+
+.env.*
+!.env.example
+.github
+Jenkinsfile
