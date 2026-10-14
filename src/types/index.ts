@@ -59,7 +59,7 @@ export interface HealthArchive {
   summary: string
 }
 
-/* ------- 九时段记录看板（管理端健康档案，/admin/v1/health-records） ------- */
+/* ------- 九时段记录看板 ------- */
 export interface NineSlotRecord {
   nodeCode: string
   nodeName: string
