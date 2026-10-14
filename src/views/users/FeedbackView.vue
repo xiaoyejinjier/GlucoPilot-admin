@@ -1,26 +1,30 @@
 <template>
-  <div class="page-wrap">
+  <div class="page-wrap paginated-page">
     <div class="head">
       <h2 class="page-title">反馈管理</h2>
       <el-button :icon="Refresh" @click="load">刷新</el-button>
     </div>
 
-    <div class="kt-card">
+    <div class="kt-card paginated-card">
       <div class="filter mb12">
-        <el-select v-model="q.type" placeholder="反馈类型" clearable style="width: 150px">
+        <el-select v-model="q.type" placeholder="反馈类型" clearable style="width: 150px" @change="search">
           <el-option v-for="t in types" :key="t" :label="t" :value="t" />
         </el-select>
-        <el-select v-model="q.status" placeholder="处理状态" clearable style="width: 150px">
+        <el-select v-model="q.status" placeholder="处理状态" clearable style="width: 150px" @change="search">
           <el-option label="待处理" value="received" />
           <el-option label="处理中" value="processing" />
           <el-option label="已完成" value="done" />
         </el-select>
-        <el-input v-model="q.keyword" placeholder="关键词" clearable :prefix-icon="Search" style="width: 200px" />
+        <el-input v-model="q.keyword" placeholder="关键词" clearable :prefix-icon="Search" style="width: 200px" @keyup.enter="search" @clear="search" />
+        <el-button type="primary" @click="search">查询</el-button>
+        <el-button @click="reset">重置</el-button>
         <span class="text-muted" style="font-size: 12px">状态流转：待处理 → 处理中 → 已完成</span>
       </div>
 
-      <el-table :data="filtered" v-loading="loading">
-        <el-table-column prop="id" label="ID" width="60" />
+      <el-table :data="list" v-loading="loading" row-key="id" height="100%" class="paginated-table">
+        <el-table-column label="序号" width="70" align="center">
+          <template #default="{ $index }">{{ (page.pageNum - 1) * page.pageSize + $index + 1 }}</template>
+        </el-table-column>
         <el-table-column label="用户" width="120">
           <template #default="{ row }">{{ row.userName }}</template>
         </el-table-column>
@@ -40,6 +44,15 @@
           </template>
         </el-table-column>
       </el-table>
+      <TablePagination
+        :page-num="page.pageNum"
+        :page-size="page.pageSize"
+        :total="page.total"
+        :summary="pageSummary"
+        :disabled="loading"
+        @size-change="changeSize"
+        @page-change="changePage"
+      />
     </div>
 
     <el-dialog v-model="dialog.visible" :title="`审批反馈 #${dialog.row?.id}`" width="560px">
@@ -71,42 +84,41 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import { api } from '@/api'
+import TablePagination from '@/components/TablePagination.vue'
+import { useServerPagination } from '@/composables/useServerPagination'
 import { useAuthStore } from '@/stores/auth'
 import type { Feedback, FeedbackStatus, FeedbackType } from '@/types'
 
 const auth = useAuthStore()
 const types: FeedbackType[] = ['产品建议', 'Bug问题', '功能诉求', '其他']
-const loading = ref(false)
 const saving = ref(false)
-const list = ref<Feedback[]>([])
 const q = reactive({ type: '' as FeedbackType | '', status: '' as FeedbackStatus | '', keyword: '' })
+type FeedbackFilters = { keyword?: string; feedbackType?: number; replyStatus?: number }
+const { page, records: list, loading, pageSummary, load, search: applyFilters, changeSize, changePage } =
+  useServerPagination<Feedback, FeedbackFilters>(api.pageFeedback, {}, { errorMessage: '反馈加载失败' })
 const dialog = reactive<{ visible: boolean; row: Feedback | null }>({ visible: false, row: null })
 const form = reactive({ status: 'received' as FeedbackStatus, reply: '' })
 
-async function load() {
-  loading.value = true
-  try {
-    list.value = await api.listFeedback()
-  } catch (error) {
-    ElMessage.error((error as Error).message || '反馈加载失败')
-  } finally {
-    loading.value = false
-  }
-}
 onMounted(load)
 
-const filtered = computed(() =>
-  list.value.filter(
-    (f) =>
-      (!q.type || f.type === q.type) &&
-      (!q.status || f.status === q.status) &&
-      (!q.keyword || f.content.includes(q.keyword) || f.userName.includes(q.keyword))
-  )
-)
+function search() {
+  return applyFilters({
+    keyword: q.keyword.trim() || undefined,
+    feedbackType: q.type ? types.indexOf(q.type) + 1 : undefined,
+    replyStatus: q.status ? ({ received: 0, processing: 1, done: 2 } as const)[q.status] : undefined
+  })
+}
+
+function reset() {
+  q.type = ''
+  q.status = ''
+  q.keyword = ''
+  return search()
+}
 
 function statusType(s: FeedbackStatus): 'danger' | 'warning' | 'success' {
   return s === 'received' ? 'danger' : s === 'processing' ? 'warning' : 'success'
@@ -144,8 +156,8 @@ async function saveReply() {
 </script>
 
 <style scoped>
-.head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.head { display: flex; flex: none; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .page-title { margin: 0; font-size: 18px; }
-.filter { display: flex; gap: 10px; align-items: center; }
+.filter { display: flex; flex: none; flex-wrap: wrap; gap: 10px; align-items: center; }
 .reply-pre { color: var(--kt-muted); }
 </style>

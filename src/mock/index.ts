@@ -1,6 +1,6 @@
 import type {
   AdminAccount, AppUser, Banner, DashboardStats, ExportTask, Feedback, FoodCategory, FoodItem,
-  HealthArchive, MediaFile, News, OperationLog, Role, SysConfig
+  HealthArchive, MediaFile, News, NineSlotDayRow, NineSlotRecord, NineSlotResult, OperationLog, Role, SysConfig
 } from '@/types'
 
 /* ============================================================
@@ -12,6 +12,16 @@ import type {
 
 const DB_KEY = 'kt_admin_db_v1'
 const delay = (ms = 160) => new Promise((r) => setTimeout(r, ms))
+function pageOf<T>(records: T[], pageNum = 1, pageSize = 20) {
+  const start = (pageNum - 1) * pageSize
+  return {
+    pageNum,
+    pageSize,
+    total: records.length,
+    pages: Math.ceil(records.length / pageSize),
+    records: records.slice(start, start + pageSize)
+  }
+}
 const d2 = (n: number) => String(n).padStart(2, '0')
 const date = (day: number) => `2026-09-${d2(day)}`
 const daysAgo = (n: number) => {
@@ -203,6 +213,74 @@ function addLog(operator: string, role: Role, module: string, action: string, de
   persist()
 }
 
+const NINE_SLOTS = [
+  { code: 'before_breakfast', name: '早餐前', meal: false },
+  { code: 'breakfast', name: '早餐', meal: true },
+  { code: 'after_breakfast', name: '早餐后', meal: false },
+  { code: 'before_lunch', name: '中餐前', meal: false },
+  { code: 'lunch', name: '中餐', meal: true },
+  { code: 'after_lunch', name: '中餐后', meal: false },
+  { code: 'before_dinner', name: '晚餐前', meal: false },
+  { code: 'dinner', name: '晚餐', meal: true },
+  { code: 'after_dinner', name: '晚餐后', meal: false }
+] as const
+
+function mockNineSlotRows(startDate: string, endDate: string): NineSlotDayRow[] {
+  const start = new Date(`${startDate}T00:00:00`)
+  const end = new Date(`${endDate}T00:00:00`)
+  const rows: NineSlotDayRow[] = []
+  for (let dayOffset = 0; dayOffset < 12; dayOffset += 1) {
+    const current = new Date(end)
+    current.setDate(current.getDate() - dayOffset)
+    if (current < start) break
+    const recordDate = `${current.getFullYear()}-${d2(current.getMonth() + 1)}-${d2(current.getDate())}`
+    for (let userOffset = 0; userOffset < 2; userOffset += 1) {
+      const user = db.users[(dayOffset * 2 + userOffset) % db.users.length]
+      const slots: Record<string, NineSlotRecord> = {}
+      let glucoseCount = 0
+      let mealCount = 0
+      let glucoseTotal = 0
+      NINE_SLOTS.forEach((node, nodeIndex) => {
+        const recorded = (dayOffset + userOffset + nodeIndex) % 5 !== 0
+        const glucoseValue = !node.meal && recorded
+          ? Math.round((4.8 + ((dayOffset * 7 + userOffset * 3 + nodeIndex * 5) % 48) / 10) * 10) / 10
+          : null
+        if (recorded && node.meal) mealCount += 1
+        if (glucoseValue !== null) {
+          glucoseCount += 1
+          glucoseTotal += glucoseValue
+        }
+        slots[node.code] = {
+          nodeCode: node.code,
+          nodeName: node.name,
+          meal: node.meal,
+          recorded,
+          glucoseValue,
+          sourceType: glucoseValue === null ? null : ((nodeIndex % 3) + 1),
+          remark: glucoseValue === null ? null : (nodeIndex === 0 ? '晨起测量' : null),
+          foodsText: node.meal && recorded ? ['燕麦、鸡蛋', '米饭、青菜、鸡胸肉', '杂粮饭、鱼肉'][nodeIndex === 1 ? 0 : nodeIndex === 4 ? 1 : 2] : null,
+          carbsG: node.meal && recorded ? 38 + nodeIndex * 2 : null,
+          predictNow: node.meal && recorded ? 7.2 + nodeIndex / 10 : null,
+          predictSuggest: node.meal && recorded ? 6.8 + nodeIndex / 10 : null,
+          recordedAt: recorded ? `${recordDate} ${nodeIndex < 3 ? '08' : nodeIndex < 6 ? '12' : '18'}:${d2(5 + nodeIndex * 3)}:00` : null
+        }
+      })
+      rows.push({
+        userId: String(user.id),
+        username: user.username,
+        nickname: user.nickname,
+        recordDate,
+        completedCount: glucoseCount + mealCount,
+        glucoseCount,
+        mealCount,
+        avgGlucose: glucoseCount ? Math.round(glucoseTotal / glucoseCount * 10) / 10 : null,
+        slots
+      })
+    }
+  }
+  return rows
+}
+
 /* ---------------- Mock API ---------------- */
 
 export const api = {
@@ -306,6 +384,15 @@ export const api = {
     db.categories = db.categories.filter((x) => x.id !== id); persist()
   },
   async listFoods() { await delay(); return [...db.foods] },
+  async pageFoods(query: { pageNum: number; pageSize: number; keyword?: string; categoryId?: number; enabled?: boolean }) {
+    await delay()
+    const rows = [...db.foods]
+      .filter((food) => !query.keyword || food.name.includes(query.keyword))
+      .filter((food) => !query.categoryId || food.categoryId === query.categoryId)
+      .filter((food) => query.enabled === undefined || food.enabled === query.enabled)
+      .sort((a, b) => b.id - a.id)
+    return pageOf(rows, query.pageNum, query.pageSize)
+  },
   async saveFood(f: FoodItem) {
     await delay()
     const i = db.foods.findIndex((x) => x.id === f.id)
@@ -318,6 +405,69 @@ export const api = {
 
   /* ------- 用户与服务 ------- */
   async listUsers() { await delay(); return [...db.users] },
+  async pageUsers(query: { pageNum: number; pageSize: number; keyword?: string; accountStatus?: number }) {
+    await delay()
+    const rows = [...db.users]
+      .filter((user) => !query.keyword || user.username.includes(query.keyword) || user.nickname.includes(query.keyword) || user.phone.includes(query.keyword))
+      .filter((user) => query.accountStatus === undefined || user.status === (query.accountStatus === 1 ? 'enabled' : 'disabled'))
+      .sort((a, b) => b.id - a.id)
+    return pageOf(rows, query.pageNum, query.pageSize)
+  },
+  async pageNineSlotRecords(query: { pageNum: number; pageSize: number; startDate: string; endDate: string; keyword?: string }): Promise<NineSlotResult> {
+    await delay()
+    const allRows = mockNineSlotRows(query.startDate, query.endDate)
+      .filter((row) => !query.keyword || row.username.includes(query.keyword) || row.nickname.includes(query.keyword))
+    const glucoseValues = allRows.flatMap((row) => Object.values(row.slots))
+      .map((slot) => slot.glucoseValue)
+      .filter((value): value is number => value !== null)
+    const targetCount = glucoseValues.filter((value) => value >= 3.9 && value < 7.8).length
+    const dates: string[] = []
+    const cursor = new Date(`${query.startDate}T00:00:00`)
+    const end = new Date(`${query.endDate}T00:00:00`)
+    while (cursor <= end) {
+      dates.push(`${cursor.getFullYear()}-${d2(cursor.getMonth() + 1)}-${d2(cursor.getDate())}`)
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    const page = pageOf(allRows, query.pageNum, query.pageSize)
+    return {
+      startDate: query.startDate,
+      endDate: query.endDate,
+      overview: {
+        activeUsers: new Set(allRows.map((row) => row.userId)).size,
+        recordDays: allRows.length,
+        glucoseRecords: glucoseValues.length,
+        mealRecords: allRows.reduce((sum, row) => sum + row.mealCount, 0),
+        totalRecords: allRows.reduce((sum, row) => sum + row.completedCount, 0),
+        avgGlucose: glucoseValues.length ? Math.round(glucoseValues.reduce((a, b) => a + b, 0) / glucoseValues.length * 10) / 10 : null,
+        complianceRate: glucoseValues.length ? Math.round(targetCount * 100 / glucoseValues.length) : 0,
+        abnormalRecords: glucoseValues.length - targetCount,
+        trend: dates.map((item) => {
+          const dayRows = allRows.filter((row) => row.recordDate === item)
+          const dayValues = dayRows.flatMap((row) => Object.values(row.slots))
+            .map((slot) => slot.glucoseValue)
+            .filter((value): value is number => value !== null)
+          return {
+            date: item,
+            glucoseCount: dayValues.length,
+            mealCount: dayRows.reduce((sum, row) => sum + row.mealCount, 0),
+            avgGlucose: dayValues.length ? Math.round(dayValues.reduce((a, b) => a + b, 0) / dayValues.length * 10) / 10 : null
+          }
+        }),
+        nodeStats: NINE_SLOTS.map((node) => {
+          const slots = allRows.map((row) => row.slots[node.code]).filter((slot) => slot?.recorded)
+          const values = slots.map((slot) => slot.glucoseValue).filter((value): value is number => value !== null)
+          return {
+            nodeCode: node.code,
+            nodeName: node.name,
+            meal: node.meal,
+            recordCount: slots.length,
+            avgGlucose: values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length * 10) / 10 : null
+          }
+        })
+      },
+      page
+    }
+  },
   async toggleUserStatus(id: number, enabled: boolean) {
     await delay()
     const u = db.users.find((x) => x.id === id)
@@ -353,7 +503,18 @@ export const api = {
       summary: `近 7 日空腹均值 6.1 mmol/L，餐后峰值偏高（${u?.nickname || ''}早餐后均值为 8.4）；主食定量与餐后散步对峰值改善明显，建议保持当前用药并继续记录。`
     }
   },
-  async listFeedback() { await delay(); return [...db.feedback].sort((a, b) => b.id - a.id) },
+  async listFeedback() { await delay(); return [...db.feedback].sort((a, b) => a.id - b.id) },
+  async pageFeedback(query: { pageNum: number; pageSize: number; keyword?: string; feedbackType?: number; replyStatus?: number }) {
+    await delay()
+    const typeNames: Feedback['type'][] = ['产品建议', 'Bug问题', '功能诉求', '其他']
+    const statusCodes: Record<Feedback['status'], number> = { received: 0, processing: 1, done: 2 }
+    const rows = [...db.feedback]
+      .filter((item) => !query.keyword || item.content.includes(query.keyword) || item.userName.includes(query.keyword))
+      .filter((item) => query.feedbackType === undefined || item.type === typeNames[query.feedbackType - 1])
+      .filter((item) => query.replyStatus === undefined || statusCodes[item.status] === query.replyStatus)
+      .sort((a, b) => a.id - b.id)
+    return pageOf(rows, query.pageNum, query.pageSize)
+  },
   async replyFeedback(id: number, reply: string, status: Feedback['status']) {
     await delay()
     const f = db.feedback.find((x) => x.id === id)
