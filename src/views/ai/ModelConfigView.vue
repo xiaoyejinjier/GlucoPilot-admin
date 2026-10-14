@@ -544,8 +544,8 @@ function buildPayload(): AiModelSavePayload {
 function isVersionConflict(e: unknown): boolean {
   const err = e as { code?: number; status?: number; message?: string }
   if (err?.code === 409 || err?.code === 40900 || err?.status === 409) return true
-  // 后端乐观锁失败用的是 BIZ_REJECTED(40001)，只能靠文案识别：
-  // "配置已被他人修改，请刷新后重试" / "缺少 configVersion（乐观锁），请刷新后重试"
+  // 后端乐观锁冲突已改用 CONFLICT(40900)（2026-10-14），上面那条是主路径；
+  // 保留文案兜底是为了兼容旧后端与其它来源的 40001 提示。
   return /请刷新后重试|他人修改|乐观锁|configVersion|版本|冲突|conflict/i.test(err?.message || '')
 }
 

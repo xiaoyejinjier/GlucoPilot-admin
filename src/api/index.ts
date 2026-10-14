@@ -529,10 +529,10 @@ export const aiModelApi = {
     requireRemote()
     return normalizeAiModelRow(await post<AiModelRow>(`/admin/v1/ai/models/${id}/default`))
   },
-  /** 后端会真的发一次最小请求，可能比较慢（见 request.ts 的 15s 前端超时）。 */
+  /** 后端会真的发一次最小请求（上限 30s），所以把前端超时放宽到 35s——否则前端先超时会给出误导性提示。 */
   async test(id: string): Promise<AiModelTestResult> {
     requireRemote()
-    return post<AiModelTestResult>(`/admin/v1/ai/models/${id}/test`)
+    return post<AiModelTestResult>(`/admin/v1/ai/models/${id}/test`, undefined, { timeout: 35000 })
   }
 }
 
