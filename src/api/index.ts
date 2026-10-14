@@ -1,5 +1,6 @@
 import type {
-  AdminAccount, AppUser, Banner, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem, HealthArchive, News, Role
+  AdminAccount, AiModelListMeta, AiModelRow, AiModelSavePayload, AiModelTestResult,
+  AppUser, Banner, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem, HealthArchive, News, Role
 } from '@/types'
 import { api as mockApi } from '@/mock'
 import { adminConfig } from '@/config'
@@ -405,6 +406,86 @@ export const ruoyiApi = {
   async previewGeneratorTable(id: number | string) {
     requireRemote()
     return get<Record<string, unknown>>(`/admin/v1/ruoyi/generator/tables/${id}/preview`)
+  }
+}
+
+/** 后端列表返回 { records, textDefaultCode, textDefaultReason, ... }（AdminAiModelDtos.ModelList）；同时兼容裸数组，避免契约微调时前端直接崩。 */
+type AiModelListData =
+  | AiModelRow[]
+  | {
+      records?: AiModelRow[] | null
+      list?: AiModelRow[] | null
+      textDefaultCode?: string | null
+      textDefaultSource?: string | null
+      textDefaultReason?: string | null
+    }
+  | null
+
+/** 列表 + "当前生效情况"：页面要能说清"现在真正在用哪个模型、为什么是它"。 */
+export interface AiModelListResult {
+  rows: AiModelRow[]
+  meta: AiModelListMeta
+}
+
+/** 后端字段几乎都可空，这里统一补齐默认值，页面层只需处理业务展示。 */
+function normalizeAiModelRow(row: AiModelRow): AiModelRow {
+  return {
+    ...row,
+    id: String(row.id ?? ''),
+    modelCode: row.modelCode || '',
+    modelName: row.modelName || '',
+    providerCode: Number(row.providerCode) || 0,
+    providerText: row.providerText || '',
+    modelEndpoint: row.modelEndpoint || '',
+    isDefault: Number(row.isDefault) === 1 ? 1 : 0,
+    isEnabled: Number(row.isEnabled) === 1 ? 1 : 0,
+    apiKeyMasked: row.apiKeyMasked || '',
+    apiKeySource: row.apiKeySource || 'none',
+    configVersion: Number(row.configVersion) || 0,
+    source: row.source === 'db' ? 'db' : 'yaml'
+  }
+}
+
+/** AI 模型配置：只走真实后端（不参与 Mock 分支），密钥不回传明文，仅给出掩码与来源。 */
+export const aiModelApi = {
+  /** 列表 + 当前生效情况（textDefault* 三个字段由后端按"默认标记→唯一启用→最近修改→yaml"选出）。 */
+  async list(): Promise<AiModelListResult> {
+    requireRemote()
+    const data = await get<AiModelListData>('/admin/v1/ai/models')
+    const rows = Array.isArray(data) ? data : data?.records || data?.list || []
+    const meta: AiModelListMeta = {
+      textDefaultCode: (Array.isArray(data) ? '' : data?.textDefaultCode) || '',
+      textDefaultSource: (Array.isArray(data) ? 'yaml' : data?.textDefaultSource) === 'db' ? 'db' : 'yaml',
+      textDefaultReason: (Array.isArray(data) ? '' : data?.textDefaultReason) || ''
+    }
+    return { rows: rows.filter(Boolean).map(normalizeAiModelRow), meta }
+  },
+  async getOne(id: string): Promise<AiModelRow> {
+    requireRemote()
+    return normalizeAiModelRow(await get<AiModelRow>(`/admin/v1/ai/models/${id}`))
+  },
+  async create(payload: AiModelSavePayload): Promise<AiModelRow> {
+    requireRemote()
+    return normalizeAiModelRow(await post<AiModelRow>('/admin/v1/ai/models', payload))
+  },
+  /** 修改必须带 configVersion，后端据此做乐观锁校验。 */
+  async update(id: string, payload: AiModelSavePayload): Promise<AiModelRow> {
+    requireRemote()
+    return normalizeAiModelRow(await put<AiModelRow>(`/admin/v1/ai/models/${id}`, payload))
+  },
+  async setEnabled(id: string, enabled: number): Promise<AiModelRow> {
+    requireRemote()
+    return normalizeAiModelRow(await post<AiModelRow>(`/admin/v1/ai/models/${id}/enabled`, { enabled: enabled ? 1 : 0 }))
+  },
+  /** 后端会顺便把其它行的默认标记清掉，调用方需要重新拉列表。 */
+  async setDefault(id: string): Promise<AiModelRow> {
+    requireRemote()
+    return normalizeAiModelRow(await post<AiModelRow>(`/admin/v1/ai/models/${id}/default`))
+  },
+  /** 后端会真的发一次最小请求，可能比较慢（见 request.ts 的 15s 前端超时）。 */
+  async test(id: string): Promise<AiModelTestResult> {
+    requireRemote()
+    return post<AiModelTestResult>(`/admin/v1/ai/models/${id}/test`)
   }
 }
 

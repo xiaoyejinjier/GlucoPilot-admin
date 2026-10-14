@@ -60,6 +60,7 @@ export const routes: RouteRecordRaw[] = [
       { path: 'monitor/jobs', name: 'monitor-jobs', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '定时任务', icon: 'Clock', roles: ['admin'], permission: 'monitor:job:manage', ruoyiResource: 'jobs' } },
       { path: 'monitor/job-logs', name: 'monitor-job-logs', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '任务日志', icon: 'List', roles: ['admin'], permission: 'monitor:job:manage', ruoyiMonitor: 'job-logs' } },
       { path: 'tool/generator', name: 'tool-generator', component: () => import('@/views/system/RuoYiGeneratorView.vue'), meta: { title: '代码生成', icon: 'DocumentAdd', roles: ['admin'], permission: 'tool:gen:manage' } },
+      { path: 'ai/model', name: 'ai-model', component: () => import('@/views/ai/ModelConfigView.vue'), meta: { title: '模型配置', icon: 'MagicStick', roles: ['admin'], permission: 'ai:model:query' } },
       { path: 'message/push', name: 'push', component: () => import('@/views/placeholder/PlaceholderView.vue'), meta: { title: '消息推送', icon: 'Bell', roles: ['admin'], placeholder: '消息推送（二期）', permission: 'message:push:manage' } },
       { path: 'ai/config', name: 'ai-config', component: () => import('@/views/placeholder/PlaceholderView.vue'), meta: { title: 'AI 服务配置', icon: 'MagicStick', roles: ['admin'], placeholder: 'AI 服务配置（二期）', permission: 'ai:config:manage' } }
     ]
@@ -128,9 +129,15 @@ export const menuGroups: MenuGroup[] = [
     ]
   },
   { title: '系统工具', icon: 'Tools', roles: ['admin'], children: [{ path: '/tool/generator', title: '代码生成', icon: 'DocumentAdd', permission: 'tool:gen:manage' }] },
+  {
+    title: 'AI 配置', icon: 'MagicStick', roles: ['admin'],
+    children: [
+      { path: '/ai/model', title: '模型配置', icon: 'MagicStick', permission: 'ai:model:query' },
+      { path: '/ai/config', title: 'AI 服务配置', icon: 'Setting', permission: 'ai:config:manage' }
+    ]
+  },
   { title: '二期占位', icon: 'Coin', roles: ['admin'], children: [
-    { path: '/message/push', title: '消息推送', icon: 'Bell', permission: 'message:push:manage' },
-    { path: '/ai/config', title: 'AI 服务配置', icon: 'MagicStick', permission: 'ai:config:manage' }
+    { path: '/message/push', title: '消息推送', icon: 'Bell', permission: 'message:push:manage' }
   ] }
 ]
 
