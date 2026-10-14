@@ -1,20 +1,25 @@
 <template>
-  <div class="page-wrap">
+  <div class="page-wrap paginated-page">
     <div class="head">
       <h2 class="page-title">用户管理</h2>
       <span class="text-muted">用户健康档案请在「健康档案」菜单中查看（仅管理员）</span>
     </div>
 
-    <div class="kt-card">
+    <div class="kt-card paginated-card">
       <div class="filter mb12">
-        <el-input v-model="q.keyword" placeholder="用户名 / 昵称 / 手机号" clearable :prefix-icon="Search" style="width: 260px" />
-        <el-select v-model="q.status" placeholder="状态" clearable style="width: 130px">
+        <el-input v-model="q.keyword" placeholder="用户名 / 昵称 / 手机号" clearable :prefix-icon="Search" style="width: 260px" @keyup.enter="search" @clear="search" />
+        <el-select v-model="q.status" placeholder="状态" clearable style="width: 130px" @change="search">
           <el-option label="正常" value="enabled" />
           <el-option label="已禁用" value="disabled" />
         </el-select>
+        <el-button type="primary" @click="search">查询</el-button>
+        <el-button @click="reset">重置</el-button>
         <el-button link type="primary" style="margin-left: auto" @click="$router.push('/user-service/archives')">前往健康档案 →</el-button>
       </div>
-      <el-table :data="userRows" v-loading="loading" row-key="id">
+      <el-table :data="users" v-loading="loading" row-key="id" height="100%" class="paginated-table">
+        <el-table-column label="序号" width="70" align="center">
+          <template #default="{ $index }">{{ (page.pageNum - 1) * page.pageSize + $index + 1 }}</template>
+        </el-table-column>
         <el-table-column label="用户" min-width="180">
           <template #default="{ row }">
             <div class="user-cell">
@@ -52,43 +57,48 @@
           </template>
         </el-table-column>
       </el-table>
+      <TablePagination
+        :page-num="page.pageNum"
+        :page-size="page.pageSize"
+        :total="page.total"
+        :summary="pageSummary"
+        :disabled="loading"
+        @size-change="changeSize"
+        @page-change="changePage"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { api } from '@/api'
+import TablePagination from '@/components/TablePagination.vue'
+import { useServerPagination } from '@/composables/useServerPagination'
 import { useAuthStore } from '@/stores/auth'
 import type { AppUser } from '@/types'
 
 const auth = useAuthStore()
-const loading = ref(false)
-const users = ref<AppUser[]>([])
 const q = reactive({ keyword: '', status: '' })
-
-async function load() {
-  loading.value = true
-  try {
-    users.value = await api.listUsers()
-  } catch (error) {
-    users.value = []
-    ElMessage.error(error instanceof Error ? error.message : '用户列表加载失败')
-  } finally {
-    loading.value = false
-  }
-}
+type UserFilters = { keyword?: string; accountStatus?: number }
+const { page, records: users, loading, pageSummary, load, search: applyFilters, changeSize, changePage } =
+  useServerPagination<AppUser, UserFilters>(api.pageUsers, {}, { errorMessage: '用户列表加载失败' })
 onMounted(load)
 
-const userRows = computed(() =>
-  users.value.filter(
-    (u) =>
-      (!q.keyword || (u.username || '').includes(q.keyword) || u.nickname.includes(q.keyword) || u.phone.includes(q.keyword)) &&
-      (!q.status || u.status === q.status)
-  )
-)
+function search() {
+  return applyFilters({
+    keyword: q.keyword.trim() || undefined,
+    accountStatus: q.status ? (q.status === 'enabled' ? 1 : 0) : undefined
+  })
+}
+
+function reset() {
+  q.keyword = ''
+  q.status = ''
+  return search()
+}
 
 async function toggle(row: AppUser, enabled: boolean) {
   try {
@@ -103,9 +113,9 @@ async function toggle(row: AppUser, enabled: boolean) {
 </script>
 
 <style scoped>
-.head { margin-bottom: 16px; }
+.head { flex: none; margin-bottom: 16px; }
 .page-title { margin: 0 0 4px; font-size: 18px; }
-.filter { display: flex; gap: 10px; align-items: center; }
+.filter { display: flex; flex: none; flex-wrap: wrap; gap: 10px; align-items: center; }
 .user-cell { display: flex; align-items: center; gap: 8px; }
 .avatar { background: var(--kt-brand); color: #fff; flex: none; }
 </style>

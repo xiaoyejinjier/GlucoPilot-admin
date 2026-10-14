@@ -59,6 +59,60 @@ export interface HealthArchive {
   summary: string
 }
 
+/* ------- 九时段记录看板 ------- */
+export interface NineSlotRecord {
+  nodeCode: string
+  nodeName: string
+  meal: boolean
+  recorded: boolean
+  glucoseValue: number | null
+  sourceType: number | null
+  remark: string | null
+  foodsText: string | null
+  carbsG: number | null
+  predictNow: number | null
+  predictSuggest: number | null
+  recordedAt: string | null
+}
+
+export interface NineSlotDayRow {
+  userId: string
+  username: string
+  nickname: string
+  recordDate: string
+  completedCount: number
+  glucoseCount: number
+  mealCount: number
+  avgGlucose: number | null
+  slots: Record<string, NineSlotRecord>
+}
+
+export interface NineSlotOverview {
+  activeUsers: number
+  recordDays: number
+  glucoseRecords: number
+  mealRecords: number
+  totalRecords: number
+  avgGlucose: number | null
+  complianceRate: number
+  abnormalRecords: number
+  trend: Array<{ date: string; glucoseCount: number; mealCount: number; avgGlucose: number | null }>
+  nodeStats: Array<{ nodeCode: string; nodeName: string; meal: boolean; recordCount: number; avgGlucose: number | null }>
+}
+
+export interface NineSlotResult {
+  startDate: string
+  endDate: string
+  overview: NineSlotOverview
+  page: {
+    pageNum: number
+    pageSize: number
+    total: number
+    pages: number
+    records: NineSlotDayRow[]
+  }
+}
+
 /* ------- 内容 CMS ------- */
 export type NewsChannel = '企业动态' | '行业快讯' | '设备新知' | '控糖科普'
 export type NewsType = 'article' | 'video'
@@ -111,6 +165,7 @@ export interface FoodCategory {
   id: number
   name: string
   sort: number
+  image?: string
 }
 
 export interface FoodItem {
@@ -125,6 +180,8 @@ export interface FoodItem {
   description: string
   enabled: boolean
   updatedAt: string
+  nutritionSource?: 'MANUAL' | 'AI_ESTIMATE' | 'AI_REVIEWED'
+  sourceModel?: string | null
 }
 
 /* ------- 反馈 ------- */

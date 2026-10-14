@@ -86,6 +86,9 @@ body {
 .page-wrap {
   padding: 16px;
 }
+.paginated-page { display: flex; flex-direction: column; height: 100%; min-height: 520px; box-sizing: border-box; }
+.paginated-card { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; box-sizing: border-box; }
+.paginated-table { flex: 1; min-height: 0; }
 .mb12 { margin-bottom: 12px; }
 .mb16 { margin-bottom: 16px; }
 .flex-between { display: flex; align-items: center; justify-content: space-between; }

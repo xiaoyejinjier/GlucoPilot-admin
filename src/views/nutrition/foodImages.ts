@@ -1,4 +1,4 @@
-import type { FoodItem } from '@/types'
+import type { FoodCategory, FoodItem } from '@/types'
 
 export interface FoodImageOption {
   label: string
@@ -71,4 +71,9 @@ export function resolveFoodImage(food: Pick<FoodItem, 'name' | 'categoryName' | 
   const image = (food.image || '').trim()
   if (legacyImageMap[image]) return legacyImageMap[image]
   return image || getBundledFoodImage(food.name, food.categoryName)
+}
+
+/** 旧分类没有图片时按大类使用默认图片，不受食品名称映射影响。 */
+export function resolveCategoryImage(category: Pick<FoodCategory, 'name' | 'image'>): string {
+  return resolveFoodImage({ name: '', categoryName: category.name, image: category.image || '' })
 }

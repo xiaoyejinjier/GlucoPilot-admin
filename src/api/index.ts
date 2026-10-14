@@ -1,5 +1,6 @@
 import type {
-  AdminAccount, AppUser, Banner, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem, HealthArchive, News, Role
+  AdminAccount, AppUser, Banner, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
+  HealthArchive, News, NineSlotResult, Role
 } from '@/types'
 import { api as mockApi } from '@/mock'
 import { adminConfig } from '@/config'
@@ -24,7 +25,19 @@ interface AdminFeedbackRow {
 }
 
 interface PageData<T> {
+  pageNum: number
+  pageSize: number
+  total: number
+  pages: number
   records: T[]
+}
+
+function queryString(params: Record<string, string | number | boolean | null | undefined>) {
+  const query = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== '' && value !== null && value !== undefined) query.set(key, String(value))
+  })
+  return query.toString()
 }
 
 interface AdminUserRow {
@@ -60,6 +73,53 @@ function feedbackStatusCode(status: FeedbackStatus): number {
   if (status === 'processing') return 1
   if (status === 'done') return 2
   return 0
+}
+
+function mapFood(f: FoodItem): FoodItem {
+  return {
+    ...numId(f),
+    categoryId: Number(f.categoryId),
+    carbs: Number(f.carbs),
+    cal: Number(f.cal),
+    gi: f.gi == null || f.gi === undefined ? null : Number(f.gi),
+    description: f.description || '',
+    image: f.image || '',
+    enabled: !!f.enabled,
+    updatedAt: f.updatedAt || ''
+  } as FoodItem
+}
+
+function mapUser(row: AdminUserRow): AppUser {
+  return {
+    id: Number(row.id),
+    username: row.username || `user_${row.id}`,
+    nickname: row.nickname || `用户#${row.id}`,
+    avatarText: row.avatarText || (row.nickname ? row.nickname.slice(0, 1) : '用'),
+    phone: row.phoneMasked || '未绑定',
+    age: Number(row.age) || 0,
+    diabetesType: row.diabetesTypeText || '未填写',
+    status: Number(row.accountStatus) === 1 ? 'enabled' : 'disabled',
+    registeredAt: row.registeredAt ? fmtTime(row.registeredAt) : '',
+    lastActiveAt: row.lastActiveAt ? fmtTime(row.lastActiveAt) : '',
+    recordCount: Number(row.recordCount) || 0,
+    mealCount: Number(row.mealCount) || 0,
+    compliance: Number(row.complianceRate) || 0
+  }
+}
+
+function mapFeedback(row: AdminFeedbackRow): Feedback {
+  return {
+    id: Number(row.id),
+    userId: Number(row.userId),
+    userName: row.userName || `用户#${row.userId}`,
+    type: feedbackTypes[row.feedbackType] || '其他',
+    content: row.contentText || '',
+    contact: row.contact || '',
+    status: feedbackStatus(Number(row.replyStatus)),
+    reply: row.officialReply || '',
+    createdAt: fmtTime(row.createdAt),
+    processedAt: row.repliedAt ? fmtTime(row.repliedAt) : ''
+  }
 }
 
 /** 真实后端 API（登录 + CMS + 营养库 + 运营账号 + 反馈闭环）；其余仍走 Mock */
@@ -149,10 +209,13 @@ const remote = {
     return list.map((c) => numId(c))
   },
   async saveCategory(c: FoodCategory) {
-    const body = { name: c.name, sort: c.sort }
+    const body = { name: c.name, sort: c.sort, image: c.image }
     const saved = c.id && Number(c.id) > 0
       ? await put<FoodCategory>(`/admin/v1/food-categories/${c.id}`, body)
       : await post<FoodCategory>('/admin/v1/food-categories', body)
+    if (c.image !== undefined && (typeof saved.image !== 'string' || saved.image.trim() !== c.image.trim())) {
+      throw new Error('分类图片未保存：当前后端未应用图片字段，请重启后端后重试')
+    }
     return numId(saved)
   },
   async removeCategory(id: number) {
@@ -160,18 +223,15 @@ const remote = {
   },
 
   async listFoods() {
-    const list = await get<FoodItem[]>('/admin/v1/foods')
-    return list.map((f) => ({
-      ...numId(f),
-      categoryId: Number(f.categoryId),
-      carbs: Number(f.carbs),
-      cal: Number(f.cal),
-      gi: f.gi == null || f.gi === undefined ? null : Number(f.gi),
-      description: f.description || '',
-      image: f.image || '',
-      enabled: !!f.enabled,
-      updatedAt: f.updatedAt || ''
-    }) as FoodItem)
+    const data = await get<PageData<FoodItem> | FoodItem[]>('/admin/v1/foods?pageNum=1&pageSize=100')
+    return (Array.isArray(data) ? data : (data.records || [])).map(mapFood)
+  },
+  async pageFoods(params: { pageNum: number; pageSize: number; keyword?: string; categoryId?: number; enabled?: boolean }) {
+    const page = await get<PageData<FoodItem>>(`/admin/v1/foods?${queryString(params)}`)
+    if (!page || Array.isArray(page) || !Array.isArray(page.records) || !Number.isFinite(Number(page.total))) {
+      throw new Error('食品接口未返回分页数据，请确认后端已更新并重启')
+    }
+    return { ...page, total: Number(page.total), records: page.records.map(mapFood) }
   },
   async saveFood(f: FoodItem) {
     const body = {
@@ -205,21 +265,14 @@ const remote = {
 
   async listUsers() {
     const page = await get<PageData<AdminUserRow>>('/admin/v1/users?pageNum=1&pageSize=100')
-    return (page.records || []).map((row) => ({
-      id: Number(row.id),
-      username: row.username || `user_${row.id}`,
-      nickname: row.nickname || `用户#${row.id}`,
-      avatarText: row.avatarText || (row.nickname ? row.nickname.slice(0, 1) : '用'),
-      phone: row.phoneMasked || '未绑定',
-      age: Number(row.age) || 0,
-      diabetesType: row.diabetesTypeText || '未填写',
-      status: Number(row.accountStatus) === 1 ? 'enabled' : 'disabled',
-      registeredAt: row.registeredAt ? fmtTime(row.registeredAt) : '',
-      lastActiveAt: row.lastActiveAt ? fmtTime(row.lastActiveAt) : '',
-      recordCount: Number(row.recordCount) || 0,
-      mealCount: Number(row.mealCount) || 0,
-      compliance: Number(row.complianceRate) || 0
-    }) as AppUser)
+    return (page.records || []).map(mapUser)
+  },
+  async pageUsers(params: { pageNum: number; pageSize: number; keyword?: string; accountStatus?: number }) {
+    const page = await get<PageData<AdminUserRow>>(`/admin/v1/users?${queryString(params)}`)
+    return { ...page, records: (page.records || []).map(mapUser) }
+  },
+  async pageNineSlotRecords(params: { pageNum: number; pageSize: number; startDate: string; endDate: string; keyword?: string }) {
+    return get<NineSlotResult>(`/admin/v1/health-records/nine-slot?${queryString(params)}`)
   },
   async toggleUserStatus(id: number, enabled: boolean) {
     await put(`/admin/v1/users/${id}/status`, { accountStatus: enabled ? 1 : 0 })
@@ -291,18 +344,11 @@ const remote = {
 
   async listFeedback() {
     const page = await get<PageData<AdminFeedbackRow>>('/admin/v1/feedbacks?pageNum=1&pageSize=100')
-    return (page.records || []).map((row) => ({
-      id: Number(row.id),
-      userId: Number(row.userId),
-      userName: row.userName || `用户#${row.userId}`,
-      type: feedbackTypes[row.feedbackType] || '其他',
-      content: row.contentText || '',
-      contact: row.contact || '',
-      status: feedbackStatus(Number(row.replyStatus)),
-      reply: row.officialReply || '',
-      createdAt: fmtTime(row.createdAt),
-      processedAt: row.repliedAt ? fmtTime(row.repliedAt) : ''
-    }) as Feedback)
+    return (page.records || []).map(mapFeedback)
+  },
+  async pageFeedback(params: { pageNum: number; pageSize: number; keyword?: string; feedbackType?: number; replyStatus?: number }) {
+    const page = await get<PageData<AdminFeedbackRow>>(`/admin/v1/feedbacks?${queryString(params)}`)
+    return { ...page, records: (page.records || []).map(mapFeedback) }
   },
   async replyFeedback(id: number, reply: string, status: FeedbackStatus) {
     await put(`/admin/v1/feedbacks/${id}/reply`, {
