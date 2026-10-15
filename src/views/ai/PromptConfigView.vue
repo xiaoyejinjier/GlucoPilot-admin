@@ -133,7 +133,7 @@
               <el-table-column label="最后修改" width="150">
                 <template #default="{ row }">{{ row.gmtModified ? fmtTime(row.gmtModified) : '—' }}</template>
               </el-table-column>
-              <el-table-column label="操作" width="168" fixed="right">
+              <el-table-column label="操作" width="230" fixed="right">
                 <template #default="{ row }">
                   <template v-if="canManage">
                     <el-button link type="primary" @click.stop="openEdit(row)">编辑</el-button>
@@ -143,7 +143,18 @@
                       :disabled="row.active"
                       :loading="activatingId === row.id"
                       @click.stop="activate(row)"
-                    >启用该版本</el-button>
+                    >启用</el-button>
+                    <!-- 只允许删草稿：生效版本删掉会让该场景静默回落到代码内置提示词，后端也会拒绝 -->
+                    <el-button
+                      v-if="!row.active"
+                      link
+                      type="danger"
+                      :loading="deletingId === row.id"
+                      @click.stop="removeDraft(row)"
+                    >删除</el-button>
+                    <el-tooltip v-else content="生效中的版本不能删除：请先启用其它版本再删这一版" placement="top">
+                      <span class="text-muted del-disabled">删除</span>
+                    </el-tooltip>
                   </template>
                   <span v-else class="text-muted">仅查看（缺 ai:prompt:manage）</span>
                 </template>
@@ -369,6 +380,7 @@ const sceneCode = ref('')
 const statusFilter = ref<number | null>(null)
 const selectedId = ref(0)
 const activatingId = ref(0)
+const deletingId = ref(0)
 const dialogVisible = ref(false)
 const editingRow = ref<AiPromptTemplateRow | null>(null)
 /** 行级 diff 的对比基准（当前生效版本）；被状态过滤挡掉时会单独拉一次 */
@@ -655,8 +667,42 @@ async function activate(row: AiPromptTemplateRow) {
   }
 }
 
-async function copyText(text: string) {
+/**
+ * 删除草稿版本（逻辑删除，可追溯）。
+ * 只在前端挡一道（按钮不显示在生效版本上），**真正的保证在后端**：SQL 里带 is_enabled = 0，
+ * 因此即使与"启用"并发，也绝不会把线上那一版删掉。
+ */
+async function removeDraft(row: AiPromptTemplateRow) {
   try {
+    await ElMessageBox.confirm(
+      `确认删除草稿「${row.version}」？` +
+        '该版本会从列表移除（数据库里保留为已删除，便于追溯），此操作不影响正在生效的版本。',
+      '删除草稿版本',
+      { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  deletingId.value = row.id
+  try {
+    await aiPromptApi.remove(row.id, row.configVersion)
+    ElMessage.success(`已删除草稿 ${row.version}`)
+    if (selectedId.value === row.id) selectedId.value = 0
+    await load()
+  } catch (e) {
+    // 后端两种拒绝：40001「正在生效，不能删除」（要用户改操作）；409「已被改动或已生效，请刷新后重试」
+    if (isStaleConflict(e)) {
+      ElMessage.error('该版本已被他人修改或已生效，已刷新列表，请重试')
+      await load()
+    } else {
+      ElMessage.error(errorMessage(e, '删除失败'))
+    }
+  } finally {
+    deletingId.value = 0
+  }
+}
+
+async function copyText(text: string) {  try {
     await navigator.clipboard.writeText(text || '')
     ElMessage.success('正文已复制到剪贴板')
   } catch {
@@ -716,6 +762,8 @@ async function copyText(text: string) {
 .prompt-text.small { max-height: 200px; }
 
 .inline-tip { margin-left: 10px; font-size: 12px; }
+/* 生效版本的"删除"是禁用态提示（不是按钮）：灰一点，避免看起来可点 */
+.del-disabled { margin-left: 12px; font-size: 13px; cursor: not-allowed; }
 .field-tip { font-size: 12px; line-height: 1.5; margin-top: 4px; }
 .mid-select { width: 320px; }
 .full-select { width: 100%; }

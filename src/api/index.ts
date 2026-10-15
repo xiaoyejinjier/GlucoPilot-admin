@@ -612,6 +612,16 @@ export const aiPromptApi = {
   async activate(id: number): Promise<void> {
     requireRemote()
     await patch<null>(`/admin/v1/ai-prompt-templates/${id}/activate`)
+  },
+  /**
+   * 删除草稿版本（逻辑删除）。**只能删草稿**：生效中的那一版删掉会让该场景静默回落到代码内置提示词，
+   * 后端会用 40001 拒绝；想换掉线上版本请用 activate(其它版本)。
+   * 带上 configVersion 可防并发覆盖（后端可选校验）。
+   */
+  async remove(id: number, configVersion?: number): Promise<void> {
+    requireRemote()
+    const qs = queryString({ configVersion })
+    await del<null>(`/admin/v1/ai-prompt-templates/${id}${qs ? `?${qs}` : ''}`)
   }
 }
 
