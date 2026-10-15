@@ -227,8 +227,17 @@
           <el-input v-model="form.templateName" placeholder="可选，如：对话（文本） v2" />
         </el-form-item>
         <el-form-item label="版本号" prop="version">
-          <el-input v-model="form.version" placeholder="可选，如 v2；留空由后端生成" />
-          <span class="text-muted inline-tip">同一场景内版本号唯一</span>
+          <el-input
+            v-model="form.version"
+            :placeholder="editingRow && editingRow.status === 1 ? '留空 = 保存时自动取下一个版本号' : '可选，如 v2；留空由后端生成'"
+          />
+          <span class="text-muted inline-tip">
+            {{
+              editingRow && editingRow.status === 1
+                ? `当前生效版本是 ${editingRow.version}；保存会追加一个新版本并沿用启用状态（留空即自动分配）`
+                : '同一场景内版本号唯一'
+            }}
+          </span>
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="form.status" class="mid-select" clearable placeholder="空 = 草稿">
@@ -335,7 +344,7 @@ import { DocumentCopy, Plus, Refresh } from '@element-plus/icons-vue'
 import { aiPromptApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { fmtTime } from '@/utils/format'
-import { errorMessage, isVersionConflict } from '@/utils/api-error'
+import { errorMessage, isDuplicateEntry, isStaleConflict } from '@/utils/api-error'
 import { diffLines, type DiffLine } from '@/utils/line-diff'
 import type { AiPromptScene, AiPromptTemplateRow, AiPromptTemplateSavePayload } from '@/types'
 
@@ -521,7 +530,10 @@ function openEdit(row: AiPromptTemplateRow) {
   editingRow.value = row
   Object.assign(form, {
     templateName: row.templateName || '',
-    version: row.version || '',
+    // 编辑**生效版本**时不用回填它自己的版本号：保存会追加新版本，版本号由后端分配（留空即自动）。
+    // 回填并原样提交会撞唯一键（后端报「已存在版本 v1」）；后端现在也会把"同号"当成未指定，
+    // 但界面上不该给出一个"看起来像新版本号、其实是旧号"的值。
+    version: row.status === 1 ? '' : row.version || '',
     promptText: row.promptText || '',
     variables: [...rowVariables(row)],
     status: row.status === 1 ? 1 : 0,
@@ -600,7 +612,10 @@ async function save() {
     dialogVisible.value = false
     await load()
   } catch (e) {
-    if (editingRow.value && isVersionConflict(e)) {
+    if (editingRow.value && isDuplicateEntry(e)) {
+      // 版本号被占了：刷新没用，必须让用户改输入，因此**保持弹窗打开**并原样展示后端文案
+      ElMessage.error(errorMessage(e, '版本号已存在，请换一个版本号'))
+    } else if (editingRow.value && isStaleConflict(e)) {
       ElMessage.error('该版本已被他人修改，已刷新列表，请重新编辑')
       dialogVisible.value = false
       await load()
@@ -629,7 +644,7 @@ async function activate(row: AiPromptTemplateRow) {
     selectedId.value = row.id
     await load()
   } catch (e) {
-    if (isVersionConflict(e)) {
+    if (isStaleConflict(e)) {
       ElMessage.error('该版本已被他人修改，已刷新列表，请重试')
       await load()
     } else {

@@ -240,7 +240,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { aiSceneApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
-import { errorMessage, isVersionConflict } from '@/utils/api-error'
+import { errorMessage, isStaleConflict } from '@/utils/api-error'
 import type { AiSceneModelOption, AiSceneRow, AiSceneSavePayload } from '@/types'
 
 interface SceneForm {
@@ -366,7 +366,7 @@ async function save() {
     ElMessage.success('已保存：本实例立即生效，其他实例最多滞后 60 秒')
     await load()
   } catch (e) {
-    if (isVersionConflict(e)) {
+    if (isStaleConflict(e)) {
       ElMessage.error('该场景配置已被他人修改，已刷新列表，请重新编辑')
       dialogVisible.value = false
       await load()
@@ -400,7 +400,7 @@ async function clearOverride(row: AiSceneRow) {
     ElMessage.success('已清空覆盖，改回继承：本实例立即生效，其他实例最多滞后 60 秒')
     await load()
   } catch (e) {
-    if (isVersionConflict(e)) {
+    if (isStaleConflict(e)) {
       ElMessage.error('该场景配置已被他人修改，已刷新列表，请重试')
       await load()
     } else {

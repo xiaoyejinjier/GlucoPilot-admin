@@ -303,7 +303,7 @@ import { Connection, Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { aiModelApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { fmtTime, nowStr } from '@/utils/format'
-import { isVersionConflict } from '@/utils/api-error'
+import { errorMessage, isDuplicateEntry, isStaleConflict } from '@/utils/api-error'
 import type {
   AiKeySource, AiModelListMeta, AiModelRow, AiModelSavePayload, AiModelTestResult, AiTestCategory
 } from '@/types'
@@ -559,12 +559,15 @@ async function save() {
     dialogVisible.value = false
     await load()
   } catch (e) {
-    if (isEdit.value && isVersionConflict(e)) {
+    if (isDuplicateEntry(e)) {
+      // 模型编码已存在：刷新没用，保持弹窗让用户改名
+      ElMessage.error(errorMessage(e, '模型编码已存在，请换一个编码'))
+    } else if (isEdit.value && isStaleConflict(e)) {
       ElMessage.error('配置已被他人修改，请刷新后重试')
       dialogVisible.value = false
       await load()
     } else {
-      ElMessage.error((e as Error).message || '保存失败')
+      ElMessage.error(errorMessage(e, '保存失败'))
     }
   } finally {
     // 请求结束即丢弃明文，不在页面内存里长期驻留
