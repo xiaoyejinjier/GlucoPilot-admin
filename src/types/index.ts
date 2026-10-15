@@ -352,6 +352,146 @@ export interface AiModelTestResult {
   message: string
 }
 
+/* ------- AI 提示词管理（/admin/v1/ai-prompt-templates，字段命名与后端契约一致） ------- */
+
+/** 场景（列表接口随 records 一起下发），activeSource 用来解释"线上到底在用哪份提示词" */
+export interface AiPromptScene {
+  sceneCode: string
+  /** 与 yaml 配置项对齐的键名，如 chat */
+  configKey: string
+  sceneName: string
+  /** 视觉场景（图片/识糖）标识 */
+  requiresVision: boolean
+  /** 代码内置兜底版本号，如 v1 */
+  builtinVersion: string
+  /** 当前生效版本标识，如 chat@v1 */
+  activeVersion: string
+  /** 生效来源：db#12=库里的第 12 行；classpath=库里没有启用版本，正在用代码内置 */
+  activeSource: string
+  /** 库内是否存在启用版本 */
+  hasEnabledVersion: boolean
+  variables: string[]
+}
+
+/** 一条提示词版本；records 是该场景的全部版本（含停用） */
+export interface AiPromptTemplateRow {
+  id: number
+  sceneCode: string
+  sceneName: string
+  /** 可选展示名，如「对话（文本） v1」 */
+  templateName: string
+  version: string
+  versionNo: number
+  promptText: string
+  variables: string[]
+  /** 后端下发的原始 JSON 串，variables 为空时兜底解析 */
+  variablesJson: string
+  /** 1=启用 0=草稿或停用；是否真的在线上生效看 active */
+  status: number
+  /** true = 该场景当前线上生效的那一条（同场景唯一） */
+  active: boolean
+  changeNote: string
+  /** 乐观锁版本号：编辑草稿时必须原样回传 */
+  configVersion: number
+  gmtModified: string
+}
+
+export interface AiPromptTemplateListData {
+  records: AiPromptTemplateRow[] | null
+  scenes: AiPromptScene[] | null
+}
+
+export interface AiPromptTemplateSavePayload {
+  sceneCode: string
+  templateName?: string | null
+  /** 可空，如 v2；空则由后端生成 */
+  version?: string | null
+  promptText: string
+  variables?: string[] | null
+  /** 0=草稿 1=启用；可空（空 = 草稿） */
+  status?: number | null
+  changeNote?: string | null
+  /** 编辑草稿时必填（乐观锁） */
+  configVersion?: number
+}
+
+export interface AiPromptSaveResult {
+  id: number
+  version: string
+  status: number
+  /** true = 后端追加了新版本（被编辑的版本已启用，不原地改） */
+  appended: boolean
+}
+
+/* ------- AI 场景 → 模型绑定（/admin/v1/ai-scenes） ------- */
+
+/** 可绑定的模型（列表接口附带下发） */
+export interface AiSceneModelOption {
+  code: string
+  name: string
+  providerCode: number
+  isDefault: boolean
+  providerName: string
+}
+
+export interface AiSceneRow {
+  sceneCode: string
+  configKey: string
+  sceneName: string
+  requiresVision: boolean
+  /** 库内覆盖值；null = 继承 */
+  modelCode: string | null
+  temperature: number | null
+  maxTokens: number | null
+  thinking: boolean | null
+  /** 0=停用 1=启用 */
+  status: number
+  /** 乐观锁版本号：该场景已有配置行时保存必填 */
+  configVersion: number
+  remark: string | null
+  /** 库里是否已有该场景的覆盖配置行 */
+  configured: boolean
+  /** 实际生效的模型编码（含兜底） */
+  effectiveModelCode: string | null
+  /** 实际生效模型的来源：db=库内绑定；其它=可见值原样展示（yaml 等兜底） */
+  effectiveModelSource: string
+  /** yaml/环境变量里的兜底值，用于解释"留空会继承成什么" */
+  yamlModelCode: string | null
+  yamlTemperature: number | null
+  yamlMaxTokens: number | null
+  yamlThinking: boolean | null
+  /** false = 视觉场景：模型编码由视觉通道统一解析，逐场景绑定不生效 */
+  modelCodeApplies: boolean
+  /** 后端下发的说明文案，直接展示 */
+  hint: string
+}
+
+export interface AiSceneListData {
+  records: AiSceneRow[] | null
+  models: AiSceneModelOption[] | null
+}
+
+/** 归一化后的列表结果：页面层拿到的 records/models 一定不是 null */
+export interface AiSceneListResult {
+  records: AiSceneRow[]
+  models: AiSceneModelOption[]
+}
+
+export interface AiSceneSavePayload {
+  /** 留空 = 继承（PUT 是整体覆盖语义） */
+  modelCode?: string | null
+  temperature?: number | null
+  maxTokens?: number | null
+  thinking?: boolean | null
+  /** 0/1，必填 */
+  status: number
+  remark?: string | null
+  /** true = 清空该场景全部覆盖，改回继承 */
+  clear?: boolean
+  /** 该场景已有配置行时必填（乐观锁） */
+  configVersion?: number
+}
+
 /* 看板统计 */
 export interface DashboardStats {
   users: { total: number; today: number; active: number }

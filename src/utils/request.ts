@@ -119,3 +119,12 @@ export function put<T>(path: string, data?: unknown, opts: AuthOrOptions = true)
 export function del<T>(path: string, opts: AuthOrOptions = true) {
   return request<T>(path, { ...asOptions(opts), method: 'DELETE' })
 }
+
+/** 局部更新：提示词模板的编辑 / 启用走 PATCH（无 body 时不发 Content-Type）。 */
+export function patch<T>(path: string, data?: unknown, opts: AuthOrOptions = true) {
+  return request<T>(path, {
+    ...asOptions(opts),
+    method: 'PATCH',
+    body: data === undefined ? undefined : JSON.stringify(data)
+  })
+}

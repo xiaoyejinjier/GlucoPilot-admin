@@ -63,6 +63,8 @@ export const routes: RouteRecordRaw[] = [
       { path: 'monitor/job-logs', name: 'monitor-job-logs', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '任务日志', icon: 'List', roles: ['admin'], permission: 'monitor:job:manage', ruoyiMonitor: 'job-logs' } },
       { path: 'tool/generator', name: 'tool-generator', component: () => import('@/views/system/RuoYiGeneratorView.vue'), meta: { title: '代码生成', icon: 'DocumentAdd', roles: ['admin'], permission: 'tool:gen:manage' } },
       { path: 'ai/model', name: 'ai-model', component: () => import('@/views/ai/ModelConfigView.vue'), meta: { title: '模型配置', icon: 'MagicStick', roles: ['admin'], permission: 'ai:model:query' } },
+      { path: 'ai/prompt', name: 'ai-prompt', component: () => import('@/views/ai/PromptConfigView.vue'), meta: { title: '提示词管理', icon: 'EditPen', roles: ['admin'], permission: 'ai:prompt:list' } },
+      { path: 'ai/scene', name: 'ai-scene', component: () => import('@/views/ai/SceneBindingView.vue'), meta: { title: '场景模型绑定', icon: 'Connection', roles: ['admin'], permission: 'ai:scene:list' } },
       { path: 'message/push', name: 'push', component: () => import('@/views/placeholder/PlaceholderView.vue'), meta: { title: '消息推送', icon: 'Bell', roles: ['admin'], placeholder: '消息推送（二期）', permission: 'message:push:manage' } },
       { path: 'ai/config', name: 'ai-config', component: () => import('@/views/placeholder/PlaceholderView.vue'), meta: { title: 'AI 服务配置', icon: 'MagicStick', roles: ['admin'], placeholder: 'AI 服务配置（二期）', permission: 'ai:config:manage' } }
     ]
@@ -137,6 +139,8 @@ export const menuGroups: MenuGroup[] = [
     title: 'AI 配置', icon: 'MagicStick', roles: ['admin'],
     children: [
       { path: '/ai/model', title: '模型配置', icon: 'MagicStick', permission: 'ai:model:query' },
+      { path: '/ai/prompt', title: '提示词管理', icon: 'EditPen', permission: 'ai:prompt:list' },
+      { path: '/ai/scene', title: '场景模型绑定', icon: 'Connection', permission: 'ai:scene:list' },
       { path: '/ai/config', title: 'AI 服务配置', icon: 'Setting', permission: 'ai:config:manage' }
     ]
   },

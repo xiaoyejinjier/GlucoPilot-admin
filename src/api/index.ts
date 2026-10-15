@@ -1,11 +1,14 @@
 import type {
   AdminAccount, AiModelListMeta, AiModelRow, AiModelSavePayload, AiModelTestResult,
+  AiPromptSaveResult, AiPromptScene, AiPromptTemplateListData, AiPromptTemplateRow,
+  AiPromptTemplateSavePayload, AiSceneListData, AiSceneListResult, AiSceneModelOption, AiSceneRow,
+  AiSceneSavePayload,
   AppUser, Banner, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
   HealthArchive, News, NineSlotResult, Role
 } from '@/types'
 import { api as mockApi } from '@/mock'
 import { adminConfig } from '@/config'
-import { del, get, post, put, setAccessToken } from '@/utils/request'
+import { del, get, patch, post, put, setAccessToken } from '@/utils/request'
 import { fmtTime } from '@/utils/format'
 
 function numId<T extends { id?: number | string }>(row: T): T & { id: number } {
@@ -533,6 +536,153 @@ export const aiModelApi = {
   async test(id: string): Promise<AiModelTestResult> {
     requireRemote()
     return post<AiModelTestResult>(`/admin/v1/ai/models/${id}/test`, undefined, { timeout: 35000 })
+  }
+}
+
+/* ---------------- AI 提示词管理（/admin/v1/ai-prompt-templates） ---------------- */
+
+/** 列表返回 records（该场景的全部版本，含停用）+ scenes（场景与生效来源），字段可能为 null。 */
+export interface AiPromptListResult {
+  rows: AiPromptTemplateRow[]
+  scenes: AiPromptScene[]
+}
+
+function normalizePromptScene(scene: AiPromptScene): AiPromptScene {
+  return {
+    ...scene,
+    sceneCode: scene.sceneCode || '',
+    configKey: scene.configKey || '',
+    sceneName: scene.sceneName || scene.sceneCode || '未命名场景',
+    requiresVision: scene.requiresVision === true,
+    builtinVersion: scene.builtinVersion || '',
+    activeVersion: scene.activeVersion || '',
+    activeSource: scene.activeSource || '',
+    hasEnabledVersion: scene.hasEnabledVersion === true,
+    variables: Array.isArray(scene.variables) ? scene.variables : []
+  }
+}
+
+/** 后端字段几乎都可空，统一补齐默认值；variablesJson 留到页面层兜底解析。 */
+function normalizePromptRow(row: AiPromptTemplateRow): AiPromptTemplateRow {
+  return {
+    ...row,
+    id: Number(row.id) || 0,
+    sceneCode: row.sceneCode || '',
+    sceneName: row.sceneName || '',
+    templateName: row.templateName || '',
+    version: row.version || '',
+    versionNo: Number(row.versionNo) || 0,
+    promptText: row.promptText || '',
+    variables: Array.isArray(row.variables) ? row.variables : [],
+    variablesJson: row.variablesJson || '',
+    status: Number(row.status) === 1 ? 1 : 0,
+    active: row.active === true,
+    changeNote: row.changeNote || '',
+    configVersion: Number(row.configVersion) || 0,
+    gmtModified: row.gmtModified || ''
+  }
+}
+
+/** 提示词模板：只走真实后端（不参与 Mock 分支）。写操作要 ai:prompt:manage。 */
+export const aiPromptApi = {
+  /** sceneCode / status 都可空；不改动 filters 时后端返回全部场景与全部版本。 */
+  async list(params: { sceneCode?: string; status?: number | null } = {}): Promise<AiPromptListResult> {
+    requireRemote()
+    const qs = queryString({ sceneCode: params.sceneCode, status: params.status ?? undefined })
+    const data = await get<AiPromptTemplateListData | null>(`/admin/v1/ai-prompt-templates${qs ? `?${qs}` : ''}`)
+    return {
+      rows: (data?.records || []).filter(Boolean).map(normalizePromptRow),
+      scenes: (data?.scenes || []).filter(Boolean).map(normalizePromptScene)
+    }
+  },
+  /** 新增版本；status 空 = 草稿。 */
+  async create(payload: AiPromptTemplateSavePayload): Promise<AiPromptSaveResult> {
+    requireRemote()
+    return post<AiPromptSaveResult>('/admin/v1/ai-prompt-templates', payload)
+  },
+  /**
+   * 编辑：草稿原地更新；已启用版本不会被原地改，后端自动追加一个新版本（appended=true），
+   * 旧版本保留用于回滚。编辑草稿必须带 configVersion。
+   */
+  async update(id: number, payload: AiPromptTemplateSavePayload): Promise<AiPromptSaveResult> {
+    requireRemote()
+    return patch<AiPromptSaveResult>(`/admin/v1/ai-prompt-templates/${id}`, payload)
+  },
+  /** 启用某个版本；后端会把同场景其它版本自动停用。 */
+  async activate(id: number): Promise<void> {
+    requireRemote()
+    await patch<null>(`/admin/v1/ai-prompt-templates/${id}/activate`)
+  }
+}
+
+/* ---------------- AI 场景 → 模型绑定（/admin/v1/ai-scenes） ---------------- */
+
+function normalizeSceneModel(model: AiSceneModelOption): AiSceneModelOption {
+  return {
+    ...model,
+    code: model.code || '',
+    name: model.name || model.code || '',
+    providerCode: Number(model.providerCode) || 0,
+    isDefault: model.isDefault === true,
+    providerName: model.providerName || ''
+  }
+}
+
+/** 覆盖值全部保留 null 语义：null = 继承（不是 0/false）。 */
+function normalizeSceneRow(row: AiSceneRow): AiSceneRow {
+  return {
+    ...row,
+    sceneCode: row.sceneCode || '',
+    configKey: row.configKey || '',
+    sceneName: row.sceneName || row.sceneCode || '未命名场景',
+    requiresVision: row.requiresVision === true,
+    modelCode: row.modelCode ?? null,
+    temperature: row.temperature ?? null,
+    maxTokens: row.maxTokens ?? null,
+    thinking: row.thinking ?? null,
+    status: Number(row.status) === 0 ? 0 : 1,
+    configVersion: Number(row.configVersion) || 0,
+    remark: row.remark ?? null,
+    configured: row.configured === true,
+    effectiveModelCode: row.effectiveModelCode ?? null,
+    effectiveModelSource: row.effectiveModelSource || '',
+    yamlModelCode: row.yamlModelCode ?? null,
+    yamlTemperature: row.yamlTemperature ?? null,
+    yamlMaxTokens: row.yamlMaxTokens ?? null,
+    yamlThinking: row.yamlThinking ?? null,
+    modelCodeApplies: row.modelCodeApplies !== false,
+    hint: row.hint || ''
+  }
+}
+
+/** 场景绑定：只走真实后端。PUT 是整体覆盖语义，留空即继承。 */
+export const aiSceneApi = {
+  async list(): Promise<AiSceneListResult> {
+    requireRemote()
+    const data = await get<AiSceneListData | null>('/admin/v1/ai-scenes')
+    return {
+      records: (data?.records || []).filter(Boolean).map(normalizeSceneRow),
+      models: (data?.models || []).filter(Boolean).map(normalizeSceneModel)
+    }
+  },
+  /** 保存绑定；成功后返回保存后的那一行（configVersion 已 +1，必须用它覆盖本地）。 */
+  async save(sceneCode: string, payload: AiSceneSavePayload): Promise<AiSceneRow> {
+    requireRemote()
+    return normalizeSceneRow(await put<AiSceneRow>(`/admin/v1/ai-scenes/${encodeURIComponent(sceneCode)}`, payload))
+  },
+  /**
+   * 清空覆盖：改回继承（clear:true 时其余覆盖字段由后端一并清掉）。
+   * status 必须带上：PUT 是整体覆盖语义，省略会被后端当成"未提交"；
+   * 这里沿用该场景当前的启停状态，避免"清空覆盖"顺带把停用场景重新启用。
+   */
+  async clear(sceneCode: string, params: { configVersion?: number; status?: number } = {}): Promise<AiSceneRow> {
+    requireRemote()
+    const body: AiSceneSavePayload = {
+      clear: true,
+      status: Number(params.status) === 0 ? 0 : 1,
+      configVersion: params.configVersion
+    }
+    return normalizeSceneRow(await put<AiSceneRow>(`/admin/v1/ai-scenes/${encodeURIComponent(sceneCode)}`, body))
   }
 }
 
