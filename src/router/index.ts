@@ -42,6 +42,7 @@ export const routes: RouteRecordRaw[] = [
       { path: 'users', name: 'users', component: () => import('@/views/users/UserListView.vue'), meta: { title: '用户管理', icon: 'User', roles: ['admin'], permission: 'user:manage' } },
       { path: 'user-service/archives', name: 'archives', component: () => import('@/views/users/ArchiveView.vue'), meta: { title: '健康档案', icon: 'Files', roles: ['admin'], permission: 'health:archive:view' } },
       { path: 'user-service/records', name: 'health-records', component: () => import('@/views/users/HealthRecordsView.vue'), meta: { title: '九时段记录', icon: 'TrendCharts', roles: ['admin'], permission: 'health:archive:view' } },
+      { path: 'user-service/glucose-alerts', name: 'glucose-alerts', component: () => import('@/views/users/GlucoseAlertsView.vue'), meta: { title: '异常血糖事件', icon: 'Warning', roles: ['admin'], permission: 'health:alert:view' } },
       { path: 'feedback', name: 'feedback', component: () => import('@/views/users/FeedbackView.vue'), meta: { title: '反馈管理', icon: 'ChatLineSquare', roles: ['admin', 'editor'], permission: 'feedback:manage' } },
       { path: 'exports', name: 'exports', component: () => import('@/views/users/ExportView.vue'), meta: { title: '导出任务', icon: 'Download', roles: ['admin', 'editor'], permission: 'export:task:manage' } },
       { path: 'system/users', name: 'system-users', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '用户管理', icon: 'User', roles: ['admin'], permission: 'system:user:manage', ruoyiResource: 'users' } },
@@ -101,7 +102,8 @@ export const menuGroups: MenuGroup[] = [
       { path: '/exports', title: '导出任务', icon: 'Download', roles: ['admin', 'editor'], permission: 'export:task:manage' },
       { path: '/users', title: '用户管理', icon: 'User', roles: ['admin'], permission: 'user:manage' },
       { path: '/user-service/archives', title: '健康档案', icon: 'Files', roles: ['admin'], permission: 'health:archive:view' },
-      { path: '/user-service/records', title: '九时段记录', icon: 'TrendCharts', roles: ['admin'], permission: 'health:archive:view' }
+      { path: '/user-service/records', title: '九时段记录', icon: 'TrendCharts', roles: ['admin'], permission: 'health:archive:view' },
+      { path: '/user-service/glucose-alerts', title: '异常血糖事件', icon: 'Warning', roles: ['admin'], permission: 'health:alert:view' }
     ]
   },
   {

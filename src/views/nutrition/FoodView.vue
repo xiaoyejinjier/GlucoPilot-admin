@@ -1,51 +1,56 @@
 <template>
   <div class="page-wrap food-page">
     <div class="head">
-      <h2 class="page-title">营养库管理（小程序食物营养库数据源）</h2>
+      <div class="heading-copy">
+        <h2 class="page-title">食物营养库</h2>
+        <span class="page-description">小程序营养数据源 · 每 100g 参考值</span>
+      </div>
       <div class="ops">
-        <el-button :icon="Download" @click="exportCsv">导出本页 CSV</el-button>
+        <el-button :icon="Download" @click="exportCsv">导出本页</el-button>
         <el-button :icon="Upload" @click="importVisible = true">批量导入</el-button>
         <el-button type="primary" :icon="Plus" @click="openFood()">新增食物</el-button>
       </div>
     </div>
 
-    <el-row :gutter="16" class="food-layout">
-      <el-col :span="6">
-        <div class="kt-card">
+    <div class="food-layout">
+      <aside class="category-column">
+        <div class="kt-card category-card">
           <div class="block-title flex-between">
-            <span>食物分类</span>
+            <span class="category-heading">食物分类 <span class="category-count">{{ categories.length }}</span></span>
             <el-button link type="primary" :icon="Plus" @click="openCategory()"
               >新增</el-button
             >
           </div>
-          <div
-            v-for="c in categories"
-            :key="c.id"
-            class="cat-row"
-            :class="{ active: filterCategory === c.id }"
-            @click="selectCategory(c.id)"
-          >
-            <span class="cat-main">
-              <img
-                :src="resolveCategoryImage(c)"
-                :alt="c.name"
-                class="cat-img"
-                @error="useCategoryFallback($event, c)"
-              />
-              <span class="cat-name" :title="c.name">{{ c.name }}</span>
-            </span>
-            <span class="cat-ops">
-              <el-icon @click.stop="openCategory(c)"><Edit /></el-icon>
-              <el-icon @click.stop="removeCategory(c)"><Delete /></el-icon>
-            </span>
+          <div class="category-list" tabindex="0" aria-label="食物分类，可上下滚动">
+            <div
+              v-for="c in categories"
+              :key="c.id"
+              class="cat-row"
+              :class="{ active: filterCategory === c.id }"
+              @click="selectCategory(c.id)"
+            >
+              <span class="cat-main">
+                <img
+                  :src="resolveCategoryImage(c)"
+                  :alt="c.name"
+                  class="cat-img"
+                  @error="useCategoryFallback($event, c)"
+                />
+                <span class="cat-name" :title="c.name">{{ c.name }}</span>
+              </span>
+              <span class="cat-ops">
+                <button type="button" class="cat-icon-button" :aria-label="`编辑${c.name}分类`" @click.stop="openCategory(c)"><el-icon><Edit /></el-icon></button>
+                <button type="button" class="cat-icon-button category-delete" :aria-label="`删除${c.name}分类`" @click.stop="removeCategory(c)"><el-icon><Delete /></el-icon></button>
+              </span>
+            </div>
           </div>
-          <el-button class="all-btn" text size="small" @click="selectCategory(0)"
-            >查看全部</el-button
+          <el-button class="all-btn" :class="{ 'all-active': filterCategory === 0 }" text size="small" @click="selectCategory(0)"
+            >查看全部食物</el-button
           >
         </div>
-      </el-col>
+      </aside>
 
-      <el-col :span="18" class="food-column">
+      <section class="food-column">
         <div class="kt-card food-card">
           <div class="filter mb12">
             <div class="filter-fields">
@@ -54,7 +59,7 @@
                 placeholder="搜索食物名称"
                 clearable
                 :prefix-icon="Search"
-                style="width: 220px"
+                class="food-search"
                 @keyup.enter="search"
                 @clear="search"
               />
@@ -62,32 +67,34 @@
                 v-model="enabledFilter"
                 placeholder="上下架状态"
                 clearable
-                style="width: 130px"
+                class="status-filter"
                 @change="search"
               >
                 <el-option label="已上架" value="enabled" />
                 <el-option label="已下架" value="disabled" />
               </el-select>
               <el-button type="primary" @click="search">查询</el-button>
-              <el-button @click="resetFilters">重置</el-button>
+              <el-button text @click="resetFilters">重置</el-button>
             </div>
-            <span class="text-muted" style="font-size: 12px"
-              >共 {{ page.total }} 条 · 碳水/热量为每 100g 参考值</span
+            <span class="result-count"
+              >共 <strong>{{ page.total }}</strong> 项食物</span
             >
           </div>
           <el-table
+            ref="foodTable"
             :data="foods"
             v-loading="loading"
             row-key="id"
             height="100%"
             class="food-table"
+            show-overflow-tooltip
           >
-            <el-table-column label="序号" width="70" align="center">
+            <el-table-column label="序号" min-width="40" align="center" class-name="index-column">
               <template #default="{ $index }">{{
                 (page.pageNum - 1) * page.pageSize + $index + 1
               }}</template>
             </el-table-column>
-            <el-table-column label="食物" min-width="180">
+            <el-table-column label="食物" min-width="140">
               <template #default="{ row }">
                 <div class="food-cell">
                   <img
@@ -96,38 +103,38 @@
                     class="food-img"
                     @error="useFallbackImage($event, row)"
                   />
-                  <span>{{ row.name }}</span>
+                  <span class="food-name" :title="row.name">{{ row.name }}</span>
                 </div>
               </template>
             </el-table-column>
-            <el-table-column prop="categoryName" label="分类" width="100" />
-            <el-table-column label="营养来源" width="150">
+            <el-table-column prop="categoryName" label="分类" min-width="56" class-name="secondary-column" />
+            <el-table-column label="营养来源" min-width="76">
               <template #default="{ row }">
-                <el-tag
+                <span
                   v-if="row.nutritionSource === 'AI_ESTIMATE'"
-                  type="warning"
-                  size="small"
-                  >模型估算·待审核</el-tag
+                  class="nutrition-source source-estimate"
+                  title="模型估算·待审核"
+                  ><i class="source-dot"></i>待审核</span
                 >
-                <el-tag
+                <span
                   v-else-if="row.nutritionSource === 'AI_REVIEWED'"
-                  type="success"
-                  size="small"
-                  >模型识别·已核对</el-tag
+                  class="nutrition-source source-reviewed"
+                  title="模型识别·已核对"
+                  ><i class="source-dot"></i>已核对</span
                 >
-                <span v-else>食品库</span>
+                <span v-else class="nutrition-source source-library" title="食品库"><i class="source-dot"></i>食品库</span>
               </template>
             </el-table-column>
-            <el-table-column label="碳水 (g)" width="110">
+            <el-table-column label="碳水 (g)" min-width="60" align="right" class-name="numeric-column">
               <template #default="{ row }">{{ row.carbs }}</template>
             </el-table-column>
-            <el-table-column label="热量 (kcal)" width="110">
+            <el-table-column label="热量 (kcal)" min-width="68" align="right" class-name="numeric-column">
               <template #default="{ row }">{{ row.cal }}</template>
             </el-table-column>
-            <el-table-column label="GI" width="80">
+            <el-table-column label="GI" min-width="40" align="right" class-name="numeric-column">
               <template #default="{ row }">{{ row.gi ?? "—" }}</template>
             </el-table-column>
-            <el-table-column label="启用" width="80">
+            <el-table-column label="启用" min-width="56" align="center" class-name="switch-column">
               <template #default="{ row }">
                 <el-switch
                   :model-value="row.enabled"
@@ -135,35 +142,38 @@
                 />
               </template>
             </el-table-column>
-            <el-table-column prop="updatedAt" label="更新时间" width="160" />
-            <el-table-column label="操作" width="130" fixed="right">
+            <el-table-column label="更新时间" min-width="108">
+              <template #default="{ row }"><span class="updated-time" :title="row.updatedAt || '未记录'">{{ formatFoodUpdatedAt(row.updatedAt) }}</span></template>
+            </el-table-column>
+            <el-table-column label="操作" min-width="76">
               <template #default="{ row }">
-                <el-button link type="primary" @click="openFood(row)">编辑</el-button>
-                <el-popconfirm title="确认删除？" @confirm="removeFood(row)">
-                  <template #reference
-                    ><el-button link type="danger">删除</el-button></template
-                  >
-                </el-popconfirm>
+                <div class="food-actions">
+                  <el-button link type="primary" @click="openFood(row)">编辑</el-button>
+                  <el-popconfirm title="确认删除？" @confirm="removeFood(row)">
+                    <template #reference
+                      ><el-button link type="danger">删除</el-button></template
+                    >
+                  </el-popconfirm>
+                </div>
               </template>
             </el-table-column>
           </el-table>
           <div class="pagination-wrap">
-            <span class="pagination-summary">{{ pageSummary }}</span>
+            <span class="pagination-summary"><span class="adaptive-size">自适应 · 每页 {{ page.pageSize }} 条</span>{{ pageSummary }}</span>
             <el-pagination
               :current-page="page.pageNum"
               :page-size="page.pageSize"
-              :page-sizes="[10, 20, 50, 100]"
               :total="page.total"
               :disabled="loading"
               background
-              layout="total, sizes, prev, pager, next, jumper"
-              @update:page-size="changeSize"
+              :pager-count="5"
+              layout="prev, pager, next, jumper"
               @update:current-page="changePage"
             />
           </div>
         </div>
-      </el-col>
-    </el-row>
+      </section>
+    </div>
 
     <!-- 分类对话框 -->
     <el-dialog
@@ -403,9 +413,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { ElMessage } from "element-plus";
-import type { UploadFile, UploadInstance } from "element-plus";
+import type { TableInstance, UploadFile, UploadInstance } from "element-plus";
 import { Delete, Download, Edit, Plus, Search, Upload } from "@element-plus/icons-vue";
 import { api } from "@/api";
 import { foodImageApi } from "@/api/food-images";
@@ -434,7 +444,41 @@ const foods = ref<FoodItem[]>([]);
 const keyword = ref("");
 const filterCategory = ref(0);
 const enabledFilter = ref("");
-const page = reactive({ pageNum: 1, pageSize: 10, total: 0 });
+const page = reactive({ pageNum: 1, pageSize: 12, total: 0 });
+const foodTable = ref<TableInstance>();
+let tableResizeObserver: ResizeObserver | undefined;
+let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+let pageDisposed = false;
+
+// Use the scroll viewport, not the number of loaded rows (especially on the last page).
+function getAdaptivePageSize(height: number, rowHeight = 52) {
+  return Math.max(1, Math.min(100, Math.floor((height - 1) / rowHeight)));
+}
+
+function measurePageSize() {
+  const table = foodTable.value?.$el as HTMLElement | undefined;
+  const viewport = table?.querySelector<HTMLElement>(".el-table__body-wrapper .el-scrollbar__wrap");
+  if (!viewport || viewport.clientHeight <= 1) return;
+  const row = table?.querySelector<HTMLElement>(".el-table__body tbody tr");
+  return getAdaptivePageSize(viewport.clientHeight, row?.getBoundingClientRect().height || 52);
+}
+
+function resizePageToFit() {
+  if (pageDisposed) return;
+  const size = measurePageSize();
+  if (size !== undefined) return changeSize(size);
+}
+
+function schedulePageResize() {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(resizePageToFit, 150);
+}
+
+function formatFoodUpdatedAt(value?: string) {
+  if (!value) return "—";
+  const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(value);
+  return match ? `${match[2]}-${match[3]} ${match[4]}:${match[5]}` : value;
+}
 const appliedFilters = reactive<{
   keyword?: string;
   categoryId?: number;
@@ -584,9 +628,29 @@ async function load() {
     if (requestId === latestFoodRequest) loading.value = false;
   }
 }
-onMounted(() => {
+onMounted(async () => {
   loadCategories();
-  load();
+  await nextTick();
+  if (pageDisposed) return;
+  page.pageSize = measurePageSize() ?? page.pageSize;
+  const table = foodTable.value?.$el as HTMLElement | undefined;
+  if (table && typeof ResizeObserver !== "undefined") {
+    tableResizeObserver = new ResizeObserver(schedulePageResize);
+    tableResizeObserver.observe(table);
+  }
+  window.addEventListener("resize", schedulePageResize);
+  await load();
+  await nextTick();
+  if (!pageDisposed) schedulePageResize();
+});
+
+onBeforeUnmount(() => {
+  pageDisposed = true;
+  ++latestFoodRequest;
+  ++latestCategoryRequest;
+  clearTimeout(resizeTimer);
+  tableResizeObserver?.disconnect();
+  window.removeEventListener("resize", schedulePageResize);
 });
 
 function search() {
@@ -838,11 +902,59 @@ async function doImport() {
   box-sizing: border-box;
 }
 .food-layout {
+  display: grid;
+  grid-template-columns: clamp(236px, 17vw, 260px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 16px;
   flex: 1;
   min-height: 0;
 }
+.category-column {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.category-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 16px 12px;
+  box-sizing: border-box;
+}
+.category-card .block-title {
+  flex: none;
+  padding: 0 6px;
+  margin-bottom: 12px;
+  font-size: 16px;
+}
+.category-card, .food-card {
+  border-color: #e5ebe7;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(32, 57, 43, 0.025);
+}
+.category-heading { display: inline-flex; align-items: center; gap: 8px; }
+.category-count { color: #97a49b; font-size: 12px; font-weight: 400; }
+.category-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #d1ddd5 transparent;
+  scrollbar-gutter: stable;
+}
+.category-list:focus-visible {
+  outline: 2px solid var(--kt-brand);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
 .food-column {
   display: flex;
+  min-width: 0;
   min-height: 0;
 }
 .food-card {
@@ -855,8 +967,64 @@ async function doImport() {
 }
 .food-table {
   flex: 1;
+  min-width: 0;
   min-height: 0;
+  font-size: var(--el-font-size-base);
+  --el-table-border-color: #eef2ef;
+  --el-table-header-bg-color: #f6f8f7;
+  --el-table-row-hover-bg-color: #f7fbf8;
 }
+.food-table :deep(.cell) {
+  padding: 0 8px;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.food-table :deep(.el-table__body .cell) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+.food-table :deep(.el-table__header .cell) {
+  color: var(--el-table-header-text-color);
+}
+.food-table :deep(.el-table__header-wrapper) {
+  border-radius: 9px;
+}
+.food-table :deep(th.el-table__cell) {
+  padding: 11px 0;
+}
+.food-table :deep(td.el-table__cell) {
+  padding: 7px 0;
+}
+.food-table :deep(.el-table__body tr) { height: 52px; }
+.food-table :deep(.index-column .cell) { color: var(--kt-muted); }
+.food-table :deep(.el-table__body .numeric-column .cell) { font-variant-numeric: tabular-nums; }
+.food-table :deep(.switch-column .cell) { padding: 0 4px; text-overflow: clip; }
+.nutrition-source { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; font-size: 12px; white-space: nowrap; }
+.source-dot { flex: none; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.source-estimate { color: #b48c4e; }
+.source-reviewed { color: var(--kt-brand-dark); }
+.source-library { color: #8b978f; }
+.updated-time { font-variant-numeric: tabular-nums; }
+.food-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+}
+.food-actions :deep(.el-button) {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-height: 28px;
+  font-size: var(--el-font-size-base);
+  font-weight: 500;
+}
+.food-actions :deep(.el-button--danger) { color: #a0aaa4; }
+.food-actions :deep(.el-button--danger:hover) { color: var(--el-color-danger); }
 .head {
   display: flex;
   flex: none;
@@ -868,35 +1036,48 @@ async function doImport() {
 }
 .page-title {
   margin: 0;
+  color: var(--kt-ink);
   font-size: 18px;
 }
+.heading-copy { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; }
+.page-description { color: var(--kt-muted); font-size: 14px; }
 .ops {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
+.ops :deep(.el-button) { height: 34px; border-radius: 8px; }
+.ops :deep(.el-button + .el-button) { margin-left: 0; }
 .block-title {
   font-weight: 600;
   margin-bottom: 10px;
 }
 .cat-row {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
-  border-radius: 6px;
+  padding: 10px 8px;
+  min-height: 68px;
+  box-sizing: border-box;
+  border-radius: 10px;
   cursor: pointer;
   font-size: 14px;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
+  border: 1px solid transparent;
+  color: var(--el-text-color-regular);
+  transition: background-color 0.15s, border-color 0.15s;
 }
 .cat-main {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 .cat-img {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
   flex: none;
   object-fit: cover;
   border-radius: 8px;
@@ -904,38 +1085,52 @@ async function doImport() {
   border: 1px solid var(--kt-line);
 }
 .cat-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-weight: 400;
 }
 .cat-row:hover {
-  background: var(--kt-brand-soft);
+  background: #f5f9f6;
 }
 .cat-row.active {
   background: var(--kt-brand-soft);
   color: var(--kt-brand);
   font-weight: 600;
+  border-color: #d4e9dc;
 }
+.cat-row.active::before { content: ''; position: absolute; left: 0; top: calc(50% - 12px); width: 3px; height: 24px; border-radius: 3px; background: var(--kt-brand); }
 .cat-ops {
-  display: none;
-  flex: none;
-  gap: 6px;
-  margin-left: 8px;
-  color: var(--kt-muted);
-}
-.cat-row:hover .cat-ops {
   display: inline-flex;
+  flex: none;
+  gap: 2px;
+  margin-left: 4px;
+  color: var(--kt-muted);
+  opacity: 0.35;
+  transition: opacity 0.15s;
 }
+.cat-row:hover .cat-ops, .cat-row:focus-within .cat-ops, .cat-row.active .cat-ops { opacity: 1; }
+.cat-icon-button { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
+.cat-icon-button:hover { color: var(--kt-brand-dark); background: var(--kt-brand-soft); }
+.category-delete:hover { color: var(--el-color-danger); background: #fff1ef; }
 .all-btn {
-  margin-top: 6px;
+  flex: none;
+  width: 100%;
+  min-height: 38px;
+  margin-top: 12px;
+  font-size: 14px;
+  border-radius: 9px;
+  color: #7c9182;
+  background: #f6f8f7;
 }
+.all-btn.all-active { color: var(--kt-brand-dark); background: var(--kt-brand-soft); font-weight: 600; }
 .filter {
   display: flex;
   flex: none;
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 .filter-fields {
   display: flex;
@@ -943,16 +1138,35 @@ async function doImport() {
   align-items: center;
   gap: 8px;
 }
+.food-search { width: 210px; }
+.status-filter { width: 118px; }
+.filter-fields :deep(.el-input__wrapper), .filter-fields :deep(.el-select__wrapper) { border-radius: 8px; background: #fafcfb; }
+.filter-fields :deep(.el-button) { border-radius: 8px; }
+.filter-fields :deep(.el-button + .el-button) { margin-left: 0; }
+.result-count { padding: 6px 10px; border-radius: 7px; background: #f7f9f8; color: #93a097; font-size: 12px; white-space: nowrap; }
+.result-count strong { color: #637d6c; font-weight: 600; }
 .food-cell {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  min-width: 0;
+}
+.food-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: inherit;
+  font-weight: 400;
 }
 .food-img {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
+  box-sizing: border-box;
+  flex-shrink: 0;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: 9px;
   background: #f7f7f7;
   border: 1px solid var(--kt-line);
 }
@@ -1006,16 +1220,45 @@ async function doImport() {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--kt-line);
 }
 .pagination-summary {
-  color: var(--kt-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  color: #93a097;
   font-size: 12px;
 }
+.adaptive-size { color: #637d6c; }
 .pagination-wrap :deep(.el-pagination) {
   max-width: 100%;
-  overflow-x: auto;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pagination-wrap :deep(.el-pager li) { border-radius: 7px; font-weight: 400; }
+.pagination-wrap :deep(.el-pager li.is-active) { color: var(--kt-brand-dark); background: var(--kt-brand-soft); font-weight: 600; }
+@media (max-width: 1380px) {
+  .food-card { padding: 12px; }
+}
+@media (max-width: 1240px) {
+  .food-card {
+    padding: 12px;
+  }
+  .food-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 260px minmax(340px, 1fr);
+  }
+  .category-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    align-content: start;
+    gap: 8px 12px;
+  }
+  .cat-row {
+    min-width: 0;
+    margin-bottom: 0;
+  }
 }
 </style>
