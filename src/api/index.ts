@@ -1,10 +1,12 @@
 import type {
-  AdminAccount, AiModelListMeta, AiModelRow, AiModelSavePayload, AiModelTestResult,
+  AdminAccount, AiMemoryListData, AiMemoryPageResult, AiMemoryRawRow, AiMemoryRow,
+  AiModelListMeta, AiModelRow, AiModelSavePayload, AiModelTestResult,
   AiPromptSaveResult, AiPromptScene, AiPromptTemplateListData, AiPromptTemplateRow,
   AiPromptTemplateSavePayload, AiSceneListData, AiSceneListResult, AiSceneModelOption, AiSceneRow,
   AiSceneSavePayload,
   AppUser, Banner, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
-  HealthArchive, News, NineSlotResult, Role
+  HealthArchive, News, NineSlotResult, OpsAuditLogListData, OpsAuditLogPageResult,
+  OpsAuditLogQuery, OpsAuditLogRawRow, OpsAuditLogRow, Role
 } from '@/types'
 import { api as mockApi } from '@/mock'
 import { adminConfig } from '@/config'
@@ -696,5 +698,102 @@ export const aiSceneApi = {
   }
 }
 
+
+/* ---------------- 用户 AI 长期记忆（/admin/v1/users/{id}/chat-memories，契约 4.14 / 4.15） ---------------- */
+
+/** 后端 Long → 字符串（防精度丢失）：只做字符串化，绝不 Number() 成数值参与运算。 */
+function longText(value: string | number | null | undefined): string {
+  return value === null || value === undefined ? '' : String(value)
+}
+
+/** 分页 total 是后端 Long 的字符串形式，转成非负整数喂给分页组件；非法值一律按 0 处理。 */
+function pageTotal(value: string | number | null | undefined): number {
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : 0
+}
+
+function normalizeMemoryRow(row: AiMemoryRawRow): AiMemoryRow {
+  return {
+    ...row,
+    id: longText(row.id),
+    memoryKey: row.memoryKey || '',
+    memoryText: row.memoryText || '',
+    confidence: Number(row.confidence) || 0,
+    sourceSessionId: longText(row.sourceSessionId),
+    updatedAt: row.updatedAt || '',
+    isAuto: row.isAuto === true
+  }
+}
+
+/** 用户 AI 长期记忆：只走真实后端（不参与 Mock 分支）。删除是**逻辑删除全部**，成功后必须重拉列表。 */
+export const aiMemoryApi = {
+  /** 分页查询某用户的长期记忆；id / sourceSessionId / total 都是字符串，页面层只做展示。 */
+  async list(userId: number | string, params: { pageNum: number; pageSize: number }): Promise<AiMemoryPageResult> {
+    requireRemote()
+    const qs = queryString(params)
+    const data = await get<AiMemoryListData | null>(
+      `/admin/v1/users/${encodeURIComponent(String(userId))}/chat-memories${qs ? `?${qs}` : ''}`
+    )
+    return {
+      records: (data?.records || []).filter(Boolean).map(normalizeMemoryRow),
+      total: pageTotal(data?.total)
+    }
+  },
+  /**
+   * 契约 4.15：逻辑删除该用户的**全部**长期记忆（对话记录/对话记忆不受影响）。
+   * 后端会写审计日志，前端删除成功后需要刷新列表。
+   */
+  async removeAll(userId: number | string): Promise<void> {
+    requireRemote()
+    await del<null>(`/admin/v1/users/${encodeURIComponent(String(userId))}/chat-memories`)
+  }
+}
+
+/* ---------------- AI 审计日志（/admin/v1/ops-audit-logs，只读） ---------------- */
+
+function normalizeAuditRow(row: OpsAuditLogRawRow): OpsAuditLogRow {
+  const costMs = Number(row.costMs)
+  const resultCode = Number(row.resultCode)
+  return {
+    ...row,
+    id: longText(row.id),
+    opsId: longText(row.opsId),
+    operatorName: row.operatorName || '',
+    roleCode: row.roleCode || '',
+    moduleCode: row.moduleCode || '',
+    actionCode: row.actionCode || '',
+    actionName: row.actionName || '',
+    targetType: row.targetType || '',
+    targetId: longText(row.targetId),
+    detailJson: row.detailJson || '',
+    requestUri: row.requestUri || '',
+    requestMethod: row.requestMethod || '',
+    clientIp: row.clientIp || '',
+    costMs: row.costMs === null || row.costMs === undefined || !Number.isFinite(costMs) ? null : costMs,
+    resultCode: Number.isFinite(resultCode) ? resultCode : 0,
+    gmtCreate: row.gmtCreate || ''
+  }
+}
+
+/** 审计日志：只读接口，后端未提供修改/删除，页面也不做任何写操作。 */
+export const opsAuditApi = {
+  /** 筛选参数（moduleCode / actionCode / targetType / targetId）全部可空，空值不拼进查询串。 */
+  async list(params: OpsAuditLogQuery = {}): Promise<OpsAuditLogPageResult> {
+    requireRemote()
+    const qs = queryString({
+      moduleCode: params.moduleCode,
+      actionCode: params.actionCode,
+      targetType: params.targetType,
+      targetId: params.targetId,
+      pageNum: params.pageNum,
+      pageSize: params.pageSize
+    })
+    const data = await get<OpsAuditLogListData | null>(`/admin/v1/ops-audit-logs${qs ? `?${qs}` : ''}`)
+    return {
+      records: (data?.records || []).filter(Boolean).map(normalizeAuditRow),
+      total: pageTotal(data?.total)
+    }
+  }
+}
 
 export { resetDb } from '@/mock'
