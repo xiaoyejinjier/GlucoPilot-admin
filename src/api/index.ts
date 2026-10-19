@@ -4,12 +4,13 @@ import type {
   AiPromptSaveResult, AiPromptScene, AiPromptTemplateListData, AiPromptTemplateRow,
   AiPromptTemplateSavePayload, AiSceneListData, AiSceneListResult, AiSceneModelOption, AiSceneRow,
   AiSceneSavePayload,
-  AppUser, Banner, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
-  HealthArchive, News, NineSlotResult, OpsAuditLogListData, OpsAuditLogPageResult,
+  AppUser, Banner, DeviceItem, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
+  HealthArchive, MediaBizType, News, NineSlotResult, OpsAuditLogListData, OpsAuditLogPageResult,
   OpsAuditLogQuery, OpsAuditLogRawRow, OpsAuditLogRow, Role
 } from '@/types'
 import { api as mockApi } from '@/mock'
 import { adminConfig } from '@/config'
+import { cmsMediaApi } from '@/api/cms-media'
 import { del, get, patch, post, put, setAccessToken } from '@/utils/request'
 import { fmtTime } from '@/utils/format'
 
@@ -130,6 +131,16 @@ function mapFeedback(row: AdminFeedbackRow): Feedback {
 
 /** 真实后端 API（登录 + CMS + 营养库 + 运营账号 + 反馈闭环）；其余仍走 Mock */
 const remote = {
+  async listMedia() {
+    return cmsMediaApi.list('all')
+  },
+  async mockUpload(_name: string, _bizType: MediaBizType, _uploader: string) {
+    throw new Error('请在媒体素材页选择资讯/轮播用途后上传真实文件，不再支持模拟登记')
+  },
+  async removeMedia(id: number) {
+    await cmsMediaApi.remove(id)
+  },
+
   async login(username: string, password: string) {
     const data = await post<{
       accessToken: string
@@ -282,6 +293,58 @@ const remote = {
   },
   async toggleUserStatus(id: number, enabled: boolean) {
     await put(`/admin/v1/users/${id}/status`, { accountStatus: enabled ? 1 : 0 })
+  },
+
+  async listDevices(params?: { keyword?: string; deviceStatus?: number }) {
+    const q = new URLSearchParams({ pageNum: '1', pageSize: '100' })
+    if (params?.keyword) q.set('keyword', params.keyword)
+    if (params?.deviceStatus !== undefined && params.deviceStatus !== null) {
+      q.set('deviceStatus', String(params.deviceStatus))
+    }
+    const page = await get<PageData<{
+      id: string
+      deviceSn: string
+      deviceName: string
+      provider: string
+      userId?: string | null
+      userMasked?: string | null
+      deviceStatus: number
+      lastSyncAt?: string | null
+    }>>(`/admin/v1/devices?${q.toString()}`)
+    return (page.records || []).map((row) => ({
+      id: Number(row.id),
+      deviceSn: row.deviceSn || '',
+      deviceName: row.deviceName || '',
+      provider: row.provider || 'MOCK',
+      userId: row.userId ? String(row.userId) : '',
+      userMasked: row.userMasked || '未绑定',
+      deviceStatus: Number(row.deviceStatus) === 1 ? 1 : 0,
+      lastSyncAt: row.lastSyncAt ? fmtTime(row.lastSyncAt) : ''
+    }) as DeviceItem)
+  },
+  async saveDevice(d: DeviceItem) {
+    const userId = d.userId && String(d.userId).trim() ? Number(d.userId) : null
+    if (d.id && Number(d.id) > 0) {
+      await put(`/admin/v1/devices/${d.id}`, {
+        deviceName: d.deviceName.trim(),
+        provider: (d.provider || 'MOCK').trim(),
+        userId
+      })
+      return d
+    }
+    const saved = await post<{ id: string }>(`/admin/v1/devices`, {
+      deviceSn: d.deviceSn.trim(),
+      deviceName: d.deviceName.trim(),
+      provider: (d.provider || 'MOCK').trim(),
+      userId
+    })
+    return { ...d, id: Number(saved.id) } as DeviceItem
+  },
+  async toggleDeviceStatus(id: number, deviceStatus: number) {
+    await put(`/admin/v1/devices/${id}/status`, { deviceStatus })
+  },
+  async removeDevice(id: number) {
+    await del(`/admin/v1/devices/${id}`)
   },
   async archiveOf(userId: number) {
     const a = await get<{

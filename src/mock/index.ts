@@ -473,6 +473,17 @@ export const api = {
     const u = db.users.find((x) => x.id === id)
     if (u) { u.status = enabled ? 'enabled' : 'disabled'; persist() }
   },
+
+  async listDevices(_params?: { keyword?: string; deviceStatus?: number }) {
+    await delay()
+    return [] as import('@/types').DeviceItem[]
+  },
+  async saveDevice(d: import('@/types').DeviceItem) {
+    await delay()
+    return { ...d, id: d.id || Date.now() }
+  },
+  async toggleDeviceStatus(_id: number, _deviceStatus: number) { await delay() },
+  async removeDevice(_id: number) { await delay() },
   async archiveOf(userId: number): Promise<HealthArchive> {
     await delay(300)
     const u = db.users.find((x) => x.id === userId)

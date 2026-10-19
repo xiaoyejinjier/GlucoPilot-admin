@@ -5,15 +5,15 @@
         <el-select v-model="biz" style="width: 170px" @change="load">
           <el-option v-for="b in bizTypes" :key="b.value" :label="b.label" :value="b.value" />
         </el-select>
-        <el-upload :show-file-list="false" :http-request="doUpload" accept="image/*">
-          <el-button type="primary" :icon="Upload">上传素材</el-button>
+        <el-upload :show-file-list="false" :http-request="doUpload" accept="image/jpeg,image/png">
+          <el-button type="primary" :icon="Upload" :loading="uploading" :disabled="biz === 'all'">上传素材</el-button>
         </el-upload>
-        <span class="text-muted tip">演示环境：选择文件后仅登记一条模拟素材记录</span>
+        <span class="text-muted tip">{{ tip }}</span>
       </div>
     </div>
 
     <div class="kt-card">
-      <el-table :data="filtered" v-loading="loading">
+      <el-table :data="list" v-loading="loading">
         <el-table-column label="缩略图" width="110">
           <template #default="{ row }"><img :src="row.url" class="thumb" /></template>
         </el-table-column>
@@ -39,59 +39,86 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 内容媒体素材页：对接 /admin/v1/cms-media，对象存储可为 local / MinIO / OSS。
+ * 上传前须选定资讯配图或轮播图用途；列表缩略图走稳定地址 /api/v1/cms/images/{id}。
+ */
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Upload } from '@element-plus/icons-vue'
-import { api } from '@/api'
-import { useAuthStore } from '@/stores/auth'
+import { cmsMediaApi, type CmsMediaPurpose } from '@/api/cms-media'
+import { adminConfig } from '@/config'
 import { humanSize } from '@/utils/format'
 import type { MediaBizType, MediaFile } from '@/types'
 
-const auth = useAuthStore()
 const bizTypes = [
   { value: 'all' as const, label: '全部用途' },
   { value: 'news' as const, label: '资讯配图' },
-  { value: 'banner' as const, label: '轮播图' },
-  { value: 'meal_photo' as const, label: '饮食照片' },
-  { value: 'avatar' as const, label: '头像' }
+  { value: 'banner' as const, label: '轮播图' }
 ]
-const biz = ref<'all' | MediaBizType>('all')
+const biz = ref<'all' | CmsMediaPurpose>('all')
 const list = ref<MediaFile[]>([])
 const loading = ref(false)
+const uploading = ref(false)
+
+const tip = computed(() => {
+  if (adminConfig.useMock) return '演示模式未接通对象存储，请关闭 Mock 后使用'
+  if (biz.value === 'all') return '请先选择「资讯配图」或「轮播图」再上传；存储走后端 local/MinIO/OSS'
+  return 'JPG/PNG，最大 5MB；凭证直传对象存储后登记，稳定地址 /api/v1/cms/images/{id}'
+})
 
 async function load() {
   loading.value = true
-  list.value = await api.listMedia()
-  loading.value = false
+  try {
+    list.value = await cmsMediaApi.list(biz.value)
+  } catch (e) {
+    ElMessage.error((e as Error).message || '加载素材失败')
+    list.value = []
+  } finally {
+    loading.value = false
+  }
 }
 onMounted(load)
-
-const filtered = computed(() => (biz.value === 'all' ? list.value : list.value.filter((m) => m.bizType === biz.value)))
 
 function bizLabel(t: MediaBizType) {
   return bizTypes.find((b) => b.value === t)?.label || t
 }
 
-async function doUpload(options: { file: File; onSuccess: (body: unknown) => void }) {
-  const uploader = auth.account?.username || 'unknown'
-  const b = biz.value === 'all' ? ('news' as MediaBizType) : biz.value
-  const m = await api.mockUpload(options.file.name, b, uploader)
-  if (auth.account) api.writeLog(auth.account.username, auth.account.role, '媒体', '上传素材', m.name)
-  ElMessage.success('上传成功（模拟）')
-  options.onSuccess(m)
-  await load()
+async function doUpload(options: { file: File; onSuccess: (body: unknown) => void; onError: (e: Error) => void }) {
+  if (biz.value === 'all') {
+    ElMessage.warning('请先选择资讯配图或轮播图')
+    options.onError(new Error('未选择用途'))
+    return
+  }
+  uploading.value = true
+  try {
+    const uploaded = await cmsMediaApi.upload(options.file, biz.value)
+    ElMessage.success('上传成功')
+    options.onSuccess(uploaded)
+    await load()
+  } catch (e) {
+    const err = e as Error
+    ElMessage.error(err.message || '上传失败')
+    options.onError(err)
+  } finally {
+    uploading.value = false
+  }
 }
 
 async function remove(row: MediaFile) {
-  await api.removeMedia(row.id)
-  ElMessage.success('已删除')
-  await load()
+  try {
+    await cmsMediaApi.remove(row.id)
+    ElMessage.success('已删除')
+    await load()
+  } catch (e) {
+    ElMessage.error((e as Error).message || '删除失败')
+  }
 }
 </script>
 
 <style scoped>
 .toolbar { display: flex; justify-content: space-between; margin-bottom: 16px; }
-.toolbar-left { display: flex; align-items: center; gap: 10px; }
+.toolbar-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .thumb { width: 72px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid var(--kt-line); background: #fff; }
 .tip { font-size: 12px; }
 </style>
