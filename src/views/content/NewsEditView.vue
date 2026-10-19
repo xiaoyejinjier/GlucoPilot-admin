@@ -41,14 +41,42 @@
         <div class="kt-card mb16">
           <div class="block-title">封面</div>
           <div class="cover-box">
-            <img v-if="form.coverUrl" :src="form.coverUrl" class="cover-img" />
+            <img v-if="coverPreview" :src="coverPreview" class="cover-img" />
             <div v-else class="cover-empty">未设置封面</div>
           </div>
           <div class="cover-ops">
-            <el-select v-model="form.coverUrl" placeholder="选择封面样式" clearable size="small" style="width: 100%">
-              <el-option v-for="i in 6" :key="i" :label="`封面样式 ${i}`" :value="`/img/news-${i}.svg`" />
+            <el-select
+              v-model="form.coverUrl"
+              placeholder="选择已上传封面或内置样式"
+              clearable
+              filterable
+              size="small"
+              style="width: 100%"
+            >
+              <el-option-group label="已上传素材">
+                <el-option v-for="opt in uploadedOptions" :key="opt.value" :label="opt.label" :value="opt.value">
+                  <div class="option-row">
+                    <img :src="opt.displayUrl" class="option-thumb" />
+                    <span>{{ opt.label }}</span>
+                  </div>
+                </el-option>
+              </el-option-group>
+              <el-option-group label="内置样式">
+                <el-option v-for="i in 6" :key="i" :label="`封面样式 ${i}`" :value="`/img/news-${i}.svg`" />
+              </el-option-group>
             </el-select>
+            <el-upload
+              class="upload-btn"
+              :show-file-list="false"
+              :http-request="uploadCover"
+              accept="image/jpeg,image/png"
+            >
+              <el-button size="small" :loading="uploading" style="width: 100%; margin-top: 8px">
+                上传封面（JPG/PNG，≤5MB）
+              </el-button>
+            </el-upload>
             <el-input v-model="form.coverText" size="small" placeholder="封面角标文字（如 科普）" style="margin-top: 8px" />
+            <p class="tip text-muted">上传走对象存储（local/MinIO/OSS），保存的是稳定路径 /api/v1/cms/images/{id}。</p>
           </div>
         </div>
         <div class="kt-card">
@@ -70,6 +98,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { api } from '@/api'
+import { cmsMediaApi, displayMediaUrl, type CmsMediaOption } from '@/api/cms-media'
 import { useAuthStore } from '@/stores/auth'
 import type { News, NewsChannel, NewsStatus } from '@/types'
 
@@ -79,6 +108,8 @@ const auth = useAuthStore()
 const channels: NewsChannel[] = ['企业动态', '行业快讯', '设备新知', '控糖科普']
 
 const saving = ref(false)
+const uploading = ref(false)
+const uploadedOptions = ref<CmsMediaOption[]>([])
 const id = Number(route.params.id || 0)
 const isEdit = computed(() => !!id && id > 0)
 
@@ -101,7 +132,18 @@ const form = reactive<News>({
   updatedAt: ''
 })
 
+const coverPreview = computed(() => displayMediaUrl(form.coverUrl))
+
+async function loadUploaded() {
+  try {
+    uploadedOptions.value = await cmsMediaApi.listOptions('news')
+  } catch {
+    uploadedOptions.value = []
+  }
+}
+
 async function load() {
+  await loadUploaded()
   if (!isEdit.value) return
   try {
     const list = await api.listNews()
@@ -114,6 +156,25 @@ async function load() {
 onMounted(load)
 
 const statusText = computed(() => (form.status === 'published' ? '已发布' : form.status === 'draft' ? '草稿' : '已下架'))
+
+async function uploadCover(options: { file: File; onSuccess: (body: unknown) => void; onError: (e: Error) => void }) {
+  uploading.value = true
+  try {
+    const uploaded = await cmsMediaApi.upload(options.file, 'news')
+    form.coverUrl = uploaded.value
+    if (!uploadedOptions.value.some((o) => o.value === uploaded.value)) {
+      uploadedOptions.value = [uploaded, ...uploadedOptions.value]
+    }
+    ElMessage.success('封面已上传')
+    options.onSuccess(uploaded)
+  } catch (e) {
+    const err = e as Error
+    ElMessage.error(err.message || '上传失败')
+    options.onError(err)
+  } finally {
+    uploading.value = false
+  }
+}
 
 async function save(status: NewsStatus) {
   if (!form.title.trim()) {
@@ -143,5 +204,9 @@ async function save(status: NewsStatus) {
 .cover-box { width: 100%; height: 150px; border: 1px dashed var(--kt-line); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #fafafa; margin-bottom: 10px; }
 .cover-img { width: 100%; height: 100%; object-fit: cover; }
 .cover-empty { color: var(--kt-muted); font-size: 13px; }
+.cover-upload { margin-top: 8px; }
 .tip { font-size: 12px; margin-top: 10px; }
+.option-row { display: flex; align-items: center; gap: 8px; }
+.option-thumb { width: 36px; height: 24px; object-fit: cover; border-radius: 4px; border: 1px solid var(--kt-line); }
+.upload-btn { width: 100%; display: block; }
 </style>

@@ -1,6 +1,7 @@
 /**
  * 内容媒体（资讯配图 / 轮播图）API。
  * 上传流程与食物图片一致：凭证 → 直传对象存储（local/MinIO/OSS）→ 登记。
+ * 持久化到资讯 coverUrl / 轮播 image 时保存稳定相对路径 /api/v1/cms/images/{id}。
  */
 import { adminConfig } from '@/config'
 import { del, get, post, request } from '@/utils/request'
@@ -22,21 +23,28 @@ export interface CmsMediaItem {
   createdAt?: string
 }
 
-/** 相对路径补上管理端 baseUrl，便于表格缩略图直接展示。 */
-function resolveUrl(fileUrl: string): string {
+/** 下拉选项：value 为入库用的相对路径，displayUrl 用于预览。 */
+export interface CmsMediaOption {
+  id: number
+  label: string
+  value: string
+  displayUrl: string
+}
+
+/** 相对路径补上管理端 baseUrl，便于缩略图展示。 */
+export function displayMediaUrl(fileUrl: string): string {
   if (!fileUrl) return ''
   if (/^https?:\/\//i.test(fileUrl)) return fileUrl
   return `${adminConfig.baseUrl}${fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`}`
 }
 
-/** 映射为媒体页沿用的 MediaFile 结构。 */
 function toMediaFile(item: CmsMediaItem): MediaFile {
   const ext = item.mimeType === 'image/png' ? 'png' : 'jpg'
   return {
     id: Number(item.id),
     name: `${item.purpose}-${item.id}.${ext}`,
     bizType: item.purpose,
-    url: resolveUrl(item.fileUrl),
+    url: displayMediaUrl(item.fileUrl),
     size: Number(item.sizeBytes) || 0,
     mime: item.mimeType || 'image/jpeg',
     uploader: item.uploader || '',
@@ -44,20 +52,37 @@ function toMediaFile(item: CmsMediaItem): MediaFile {
   }
 }
 
+function toOption(item: CmsMediaItem): CmsMediaOption {
+  return {
+    id: Number(item.id),
+    label: `${item.purpose === 'banner' ? '轮播' : '资讯'} #${item.id}`,
+    value: item.fileUrl,
+    displayUrl: displayMediaUrl(item.fileUrl)
+  }
+}
+
+async function fetchItems(purpose?: CmsMediaPurpose | 'all'): Promise<CmsMediaItem[]> {
+  if (adminConfig.useMock) return []
+  const query = purpose && purpose !== 'all' ? `?purpose=${encodeURIComponent(purpose)}` : ''
+  return (await get<CmsMediaItem[]>(`/admin/v1/cms-media${query}`)) || []
+}
+
 export const cmsMediaApi = {
-  /** 列出已登记素材；purpose=all 或不传则拉全部。 */
+  /** 列出已登记素材（媒体页表格）。 */
   async list(purpose?: CmsMediaPurpose | 'all'): Promise<MediaFile[]> {
-    if (adminConfig.useMock) return []
-    const query = purpose && purpose !== 'all' ? `?purpose=${encodeURIComponent(purpose)}` : ''
-    const rows = await get<CmsMediaItem[]>(`/admin/v1/cms-media${query}`)
-    return (rows || []).map(toMediaFile)
+    return (await fetchItems(purpose)).map(toMediaFile)
+  },
+
+  /** 列出可选图片（资讯封面 / 轮播选择器）。 */
+  async listOptions(purpose: CmsMediaPurpose): Promise<CmsMediaOption[]> {
+    return (await fetchItems(purpose)).map(toOption)
   },
 
   /**
-   * 上传一张 JPG/PNG（≤5MB）。
+   * 上传 JPG/PNG（≤5MB），返回入库用相对路径。
    * MinIO 场景下 uploadUrl 为预签名地址，原样 PUT；local 场景走同源代理路径。
    */
-  async upload(file: File, purpose: CmsMediaPurpose): Promise<MediaFile> {
+  async upload(file: File, purpose: CmsMediaPurpose): Promise<CmsMediaOption> {
     if (adminConfig.useMock) throw new Error('上传内容图片需要连接后端，请关闭演示模式')
     if (!['image/jpeg', 'image/png'].includes(file.type)) throw new Error('请选择 JPG 或 PNG 图片')
     if (!file.size || file.size > 5 * 1024 * 1024) throw new Error('图片大小不能超过 5MB')
@@ -67,7 +92,6 @@ export const cmsMediaApi = {
       '/admin/v1/cms-media/upload-credentials',
       body
     )
-    // 本地直传也经过统一代理；云存储/MinIO 预签名 URL 必须原样使用。
     const localPath = new URL(credential.uploadUrl, window.location.origin).pathname
     const uploadUrl = localPath.startsWith('/api/v1/media-files/local-uploads/')
       ? `${adminConfig.baseUrl}${localPath}`
@@ -97,7 +121,7 @@ export const cmsMediaApi = {
       headers: { 'X-Idempotency-Key': idempotencyKey },
       body: JSON.stringify({ ...body, storageKey: credential.storageKey })
     })
-    return toMediaFile(saved)
+    return toOption(saved)
   },
 
   /** 软删除素材。 */

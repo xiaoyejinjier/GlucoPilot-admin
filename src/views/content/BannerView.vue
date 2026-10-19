@@ -8,7 +8,7 @@
     <div class="kt-card">
       <el-table :data="list" v-loading="loading">
         <el-table-column label="预览" width="120">
-          <template #default="{ row }"><img :src="row.image" class="banner-thumb" /></template>
+          <template #default="{ row }"><img :src="preview(row.image)" class="banner-thumb" /></template>
         </el-table-column>
         <el-table-column prop="title" label="标题" min-width="150" />
         <el-table-column label="跳转" min-width="200">
@@ -41,10 +41,16 @@
         </el-form-item>
         <el-form-item label="图片">
           <div class="img-row">
-            <img :src="dialog.form.image" class="banner-thumb" />
-            <el-select v-model="dialog.form.image" style="width: 240px">
-              <el-option v-for="i in 4" :key="i" :label="`轮播样式 ${i}`" :value="`/img/banner-${i}.svg`" />
-            </el-select>
+            <img :src="preview(dialog.form.image)" class="banner-thumb" />
+            <div class="img-ops">
+              <el-select v-model="dialog.form.image" style="width: 240px">
+                <el-option v-for="item in images" :key="item.value" :label="item.label" :value="item.value" />
+                <el-option v-for="i in 4" :key="`preset-${i}`" :label="`内置样式 ${i}`" :value="`/img/banner-${i}.svg`" />
+              </el-select>
+              <el-upload :show-file-list="false" :http-request="uploadImage" accept="image/jpeg,image/png">
+                <el-button size="small" :loading="uploading">上传 JPG/PNG</el-button>
+              </el-upload>
+            </div>
           </div>
         </el-form-item>
         <el-form-item label="跳转类型">
@@ -80,21 +86,51 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { api } from '@/api'
+import { cmsMediaApi, displayMediaUrl, type CmsMediaOption } from '@/api/cms-media'
 import { useAuthStore } from '@/stores/auth'
 import type { Banner } from '@/types'
 
 const auth = useAuthStore()
 const loading = ref(false)
 const saving = ref(false)
+const uploading = ref(false)
 const list = ref<Banner[]>([])
+const images = ref<CmsMediaOption[]>([])
 const dialog = reactive<{ visible: boolean; form: Banner }>({
   visible: false,
   form: { id: 0, title: '', image: '/img/banner-1.svg', linkType: 'article', linkValue: '', sort: 1, enabled: true, remark: '' }
 })
 
+function preview(url: string) {
+  return displayMediaUrl(url)
+}
+
+async function loadImages() {
+  try {
+    images.value = await cmsMediaApi.listOptions('banner')
+  } catch (e) {
+    ElMessage.error((e as Error).message || '加载轮播素材失败')
+  }
+}
+
+async function uploadImage(options: { file: File }) {
+  uploading.value = true
+  try {
+    const saved = await cmsMediaApi.upload(options.file, 'banner')
+    images.value = [saved, ...images.value.filter((item) => item.value !== saved.value)]
+    dialog.form.image = saved.value
+    ElMessage.success('图片已上传')
+  } catch (e) {
+    ElMessage.error((e as Error).message || '图片上传失败')
+  } finally {
+    uploading.value = false
+  }
+}
+
 async function load() {
   loading.value = true
   try {
+    await loadImages()
     list.value = await api.listBanners()
   } catch (e) {
     ElMessage.error((e as Error).message || '加载轮播失败')
@@ -138,4 +174,5 @@ async function remove(row: Banner) {
 .title { font-size: 16px; font-weight: 600; }
 .banner-thumb { width: 96px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid var(--kt-line); }
 .img-row { display: flex; align-items: center; gap: 10px; }
+.img-ops { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 </style>

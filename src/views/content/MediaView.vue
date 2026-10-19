@@ -92,9 +92,9 @@ async function doUpload(options: { file: File; onSuccess: (body: unknown) => voi
   }
   uploading.value = true
   try {
-    const m = await cmsMediaApi.upload(options.file, biz.value)
+    const uploaded = await cmsMediaApi.upload(options.file, biz.value)
     ElMessage.success('上传成功')
-    options.onSuccess(m)
+    options.onSuccess(uploaded)
     await load()
   } catch (e) {
     const err = e as Error
