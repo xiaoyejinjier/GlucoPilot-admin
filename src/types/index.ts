@@ -184,6 +184,19 @@ export interface FoodItem {
   sourceModel?: string | null
 }
 
+
+/* ------- 设备档案 ------- */
+export interface DeviceItem {
+  id: number
+  deviceSn: string
+  deviceName: string
+  provider: string
+  userId: string
+  userMasked: string
+  deviceStatus: number
+  lastSyncAt: string
+}
+
 /* ------- 反馈 ------- */
 export type FeedbackType = '产品建议' | 'Bug问题' | '功能诉求' | '其他'
 export type FeedbackStatus = 'received' | 'processing' | 'done'
