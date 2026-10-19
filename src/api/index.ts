@@ -4,10 +4,11 @@ import type { DeviceItem,
   AiPromptTemplateSavePayload, AiSceneListData, AiSceneListResult, AiSceneModelOption, AiSceneRow,
   AiSceneSavePayload,
   AppUser, Banner, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
-  HealthArchive, News, NineSlotResult, Role
+  HealthArchive, MediaBizType, News, NineSlotResult, Role
 } from '@/types'
 import { api as mockApi } from '@/mock'
 import { adminConfig } from '@/config'
+import { cmsMediaApi } from '@/api/cms-media'
 import { del, get, patch, post, put, setAccessToken } from '@/utils/request'
 import { fmtTime } from '@/utils/format'
 
@@ -128,6 +129,16 @@ function mapFeedback(row: AdminFeedbackRow): Feedback {
 
 /** 真实后端 API（登录 + CMS + 营养库 + 运营账号 + 反馈闭环）；其余仍走 Mock */
 const remote = {
+  async listMedia() {
+    return cmsMediaApi.list('all')
+  },
+  async mockUpload(_name: string, _bizType: MediaBizType, _uploader: string) {
+    throw new Error('请在媒体素材页选择资讯/轮播用途后上传真实文件，不再支持模拟登记')
+  },
+  async removeMedia(id: number) {
+    await cmsMediaApi.remove(id)
+  },
+
   async login(username: string, password: string) {
     const data = await post<{
       accessToken: string
