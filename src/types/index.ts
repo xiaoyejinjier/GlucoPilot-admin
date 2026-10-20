@@ -185,6 +185,19 @@ export interface FoodItem {
   reviewImage?: string | null // 只读：待审核实拍预览，需运营鉴权
 }
 
+
+/* ------- 设备档案 ------- */
+export interface DeviceItem {
+  id: number
+  deviceSn: string
+  deviceName: string
+  provider: string
+  userId: string
+  userMasked: string
+  deviceStatus: number
+  lastSyncAt: string
+}
+
 /* ------- 反馈 ------- */
 export type FeedbackType = '产品建议' | 'Bug问题' | '功能诉求' | '其他'
 export type FeedbackStatus = 'received' | 'processing' | 'done'
@@ -491,6 +504,109 @@ export interface AiSceneSavePayload {
   clear?: boolean
   /** 该场景已有配置行时必填（乐观锁） */
   configVersion?: number
+}
+
+/* ------- 用户 AI 长期记忆（/admin/v1/users/{id}/chat-memories，契约 4.14 查询 / 4.15 全删） ------- */
+
+/**
+ * 后端原始行。注意 id / sourceSessionId 是后端 Long 序列化出来的**字符串**（防精度丢失），
+ * total 同理，一律按字符串处理，禁止参与数值运算。
+ */
+export interface AiMemoryRawRow {
+  id: string | number | null
+  memoryKey?: string | null
+  memoryText?: string | null
+  /** 0-100，页面按 >=80 绿 / 60-79 黄 / <60 灰 分档 */
+  confidence?: number | null
+  sourceSessionId?: string | number | null
+  updatedAt?: string | null
+  /** true = 模型自动抽取；false = 人工/用户主动告知 */
+  isAuto?: boolean | null
+}
+
+/** 归一化后的展示行：字段一定存在，页面层不必再判空 */
+export interface AiMemoryRow {
+  id: string
+  memoryKey: string
+  memoryText: string
+  confidence: number
+  sourceSessionId: string
+  updatedAt: string
+  isAuto: boolean
+}
+
+export interface AiMemoryListData {
+  records: AiMemoryRawRow[] | null
+  total: string | number | null
+}
+
+export interface AiMemoryPageResult {
+  records: AiMemoryRow[]
+  /** 已转成 number（分页组件要求整数） */
+  total: number
+}
+
+/* ------- AI 审计日志（/admin/v1/ops-audit-logs，只读查询） ------- */
+
+/** 后端原始行：除 costMs / resultCode 外均为字符串，可空字段很多 */
+export interface OpsAuditLogRawRow {
+  id: string | number | null
+  opsId?: string | number | null
+  operatorName?: string | null
+  roleCode?: string | null
+  moduleCode?: string | null
+  actionCode?: string | null
+  actionName?: string | null
+  targetType?: string | null
+  targetId?: string | number | null
+  /** 原始 JSON 字符串：页面层负责美化展示，不要当对象用 */
+  detailJson?: string | null
+  requestUri?: string | null
+  requestMethod?: string | null
+  clientIp?: string | null
+  costMs?: number | null
+  /** 0 = 成功；其它为失败码 */
+  resultCode?: number | null
+  gmtCreate?: string | null
+}
+
+export interface OpsAuditLogRow {
+  id: string
+  opsId: string
+  operatorName: string
+  roleCode: string
+  moduleCode: string
+  actionCode: string
+  actionName: string
+  targetType: string
+  targetId: string
+  detailJson: string
+  requestUri: string
+  requestMethod: string
+  clientIp: string
+  costMs: number | null
+  resultCode: number
+  gmtCreate: string
+}
+
+export interface OpsAuditLogListData {
+  records: OpsAuditLogRawRow[] | null
+  total: string | number | null
+}
+
+export interface OpsAuditLogPageResult {
+  records: OpsAuditLogRow[]
+  total: number
+}
+
+/** 审计日志查询条件：全部可空，空值不参与查询串 */
+export interface OpsAuditLogQuery {
+  moduleCode?: string
+  actionCode?: string
+  targetType?: string
+  targetId?: string
+  pageNum?: number
+  pageSize?: number
 }
 
 /* 看板统计 */

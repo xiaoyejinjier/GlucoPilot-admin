@@ -41,6 +41,7 @@ export const routes: RouteRecordRaw[] = [
       { path: 'content/media', name: 'media', component: () => import('@/views/content/MediaView.vue'), meta: { title: '媒体素材', icon: 'FolderOpened', roles: ['admin', 'editor'], permission: 'content:media:manage' } },
       { path: 'nutrition/foods', name: 'foods', component: () => import('@/views/nutrition/FoodView.vue'), meta: { title: '营养库管理', icon: 'Apple', roles: ['admin', 'editor'], permission: 'food:library:manage' } },
       { path: 'users', name: 'users', component: () => import('@/views/users/UserListView.vue'), meta: { title: '用户管理', icon: 'User', roles: ['admin'], permission: 'user:manage' } },
+      { path: 'devices', name: 'devices', component: () => import('@/views/users/DeviceView.vue'), meta: { title: '设备管理', icon: 'Cpu', roles: ['admin', 'editor'], permission: 'device:manage' } },
       { path: 'user-service/archives', name: 'archives', component: () => import('@/views/users/ArchiveView.vue'), meta: { title: '健康档案', icon: 'Files', roles: ['admin'], permission: 'health:archive:view' } },
       { path: 'user-service/records', name: 'health-records', component: () => import('@/views/users/HealthRecordsView.vue'), meta: { title: '九时段记录', icon: 'TrendCharts', roles: ['admin'], permission: 'health:archive:view' } },
       { path: 'user-service/glucose-alerts', name: 'glucose-alerts', component: () => import('@/views/users/GlucoseAlertsView.vue'), meta: { title: '异常血糖事件', icon: 'Warning', roles: ['admin'], permission: 'health:alert:view' } },
@@ -55,6 +56,7 @@ export const routes: RouteRecordRaw[] = [
       { path: 'system/dict-data', name: 'system-dict-data', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '字典数据', icon: 'CollectionTag', roles: ['admin'], permission: 'system:dict:manage', ruoyiResource: 'dict-data' } },
       { path: 'system/config', name: 'config', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '系统参数', icon: 'Setting', roles: ['admin'], permission: 'system:config:manage', ruoyiResource: 'configs' } },
       { path: 'system/notices', name: 'system-notices', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '通知公告', icon: 'Bell', roles: ['admin'], permission: 'system:notice:manage', ruoyiResource: 'notices' } },
+      { path: 'system/audit-logs', name: 'system-audit-logs', component: () => import('@/views/system/AuditLogView.vue'), meta: { title: 'AI 审计日志', icon: 'DocumentChecked', roles: ['admin'], permission: 'ai:audit:view' } },
       { path: 'monitor/online', name: 'monitor-online', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '在线用户', icon: 'User', roles: ['admin'], permission: 'monitor:online:list', ruoyiMonitor: 'online' } },
       { path: 'monitor/login-logs', name: 'monitor-login-logs', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '登录日志', icon: 'Tickets', roles: ['admin'], permission: 'monitor:logininfor:list', ruoyiMonitor: 'login-logs' } },
       { path: 'monitor/oper-logs', name: 'monitor-oper-logs', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '操作日志', icon: 'Document', roles: ['admin'], permission: 'monitor:operlog:list', ruoyiMonitor: 'oper-logs' } },
@@ -102,6 +104,7 @@ export const menuGroups: MenuGroup[] = [
   {
     title: '用户与服务', icon: 'Service', roles: ['admin', 'editor'],
     children: [
+      { path: '/devices', title: '设备管理', icon: 'Cpu', roles: ['admin', 'editor'], permission: 'device:manage' },
       { path: '/feedback', title: '反馈管理', icon: 'ChatLineSquare', roles: ['admin', 'editor'], permission: 'feedback:manage' },
       { path: '/exports', title: '导出任务', icon: 'Download', roles: ['admin', 'editor'], permission: 'export:task:manage' },
       { path: '/users', title: '用户管理', icon: 'User', roles: ['admin'], permission: 'user:manage' },
@@ -130,6 +133,7 @@ export const menuGroups: MenuGroup[] = [
       { path: '/monitor/online', title: '在线用户', icon: 'User', permission: 'monitor:online:list' },
       { path: '/monitor/login-logs', title: '登录日志', icon: 'Tickets', permission: 'monitor:logininfor:list' },
       { path: '/monitor/oper-logs', title: '操作日志', icon: 'Document', permission: 'monitor:operlog:list' },
+      { path: '/system/audit-logs', title: 'AI 审计日志', icon: 'DocumentChecked', permission: 'ai:audit:view' },
       { path: '/monitor/server', title: '服务监控', icon: 'Cpu', permission: 'monitor:server:list' },
       { path: '/monitor/cache', title: '缓存监控', icon: 'Coin', permission: 'monitor:cache:manage' },
       { path: '/monitor/jobs', title: '定时任务', icon: 'Clock', permission: 'monitor:job:manage' },

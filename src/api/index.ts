@@ -1,13 +1,16 @@
 import type {
-  AdminAccount, AiModelListMeta, AiModelRow, AiModelSavePayload, AiModelTestResult,
+  AdminAccount, AiMemoryListData, AiMemoryPageResult, AiMemoryRawRow, AiMemoryRow,
+  AiModelListMeta, AiModelRow, AiModelSavePayload, AiModelTestResult,
   AiPromptSaveResult, AiPromptScene, AiPromptTemplateListData, AiPromptTemplateRow,
   AiPromptTemplateSavePayload, AiSceneListData, AiSceneListResult, AiSceneModelOption, AiSceneRow,
   AiSceneSavePayload,
-  AppUser, Banner, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
-  HealthArchive, News, NineSlotResult, Role
+  AppUser, Banner, DeviceItem, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
+  HealthArchive, MediaBizType, News, NineSlotResult, OpsAuditLogListData, OpsAuditLogPageResult,
+  OpsAuditLogQuery, OpsAuditLogRawRow, OpsAuditLogRow, Role
 } from '@/types'
 import { api as mockApi } from '@/mock'
 import { adminConfig } from '@/config'
+import { cmsMediaApi } from '@/api/cms-media'
 import { del, get, patch, post, put, setAccessToken } from '@/utils/request'
 import { fmtTime } from '@/utils/format'
 
@@ -129,6 +132,16 @@ function mapFeedback(row: AdminFeedbackRow): Feedback {
 
 /** 真实后端 API（登录 + CMS + 营养库 + 运营账号 + 反馈闭环）；其余仍走 Mock */
 const remote = {
+  async listMedia() {
+    return cmsMediaApi.list('all')
+  },
+  async mockUpload(_name: string, _bizType: MediaBizType, _uploader: string) {
+    throw new Error('请在媒体素材页选择资讯/轮播用途后上传真实文件，不再支持模拟登记')
+  },
+  async removeMedia(id: number) {
+    await cmsMediaApi.remove(id)
+  },
+
   async login(username: string, password: string) {
     const data = await post<{
       accessToken: string
@@ -281,6 +294,58 @@ const remote = {
   },
   async toggleUserStatus(id: number, enabled: boolean) {
     await put(`/admin/v1/users/${id}/status`, { accountStatus: enabled ? 1 : 0 })
+  },
+
+  async listDevices(params?: { keyword?: string; deviceStatus?: number }) {
+    const q = new URLSearchParams({ pageNum: '1', pageSize: '100' })
+    if (params?.keyword) q.set('keyword', params.keyword)
+    if (params?.deviceStatus !== undefined && params.deviceStatus !== null) {
+      q.set('deviceStatus', String(params.deviceStatus))
+    }
+    const page = await get<PageData<{
+      id: string
+      deviceSn: string
+      deviceName: string
+      provider: string
+      userId?: string | null
+      userMasked?: string | null
+      deviceStatus: number
+      lastSyncAt?: string | null
+    }>>(`/admin/v1/devices?${q.toString()}`)
+    return (page.records || []).map((row) => ({
+      id: Number(row.id),
+      deviceSn: row.deviceSn || '',
+      deviceName: row.deviceName || '',
+      provider: row.provider || 'MOCK',
+      userId: row.userId ? String(row.userId) : '',
+      userMasked: row.userMasked || '未绑定',
+      deviceStatus: Number(row.deviceStatus) === 1 ? 1 : 0,
+      lastSyncAt: row.lastSyncAt ? fmtTime(row.lastSyncAt) : ''
+    }) as DeviceItem)
+  },
+  async saveDevice(d: DeviceItem) {
+    const userId = d.userId && String(d.userId).trim() ? Number(d.userId) : null
+    if (d.id && Number(d.id) > 0) {
+      await put(`/admin/v1/devices/${d.id}`, {
+        deviceName: d.deviceName.trim(),
+        provider: (d.provider || 'MOCK').trim(),
+        userId
+      })
+      return d
+    }
+    const saved = await post<{ id: string }>(`/admin/v1/devices`, {
+      deviceSn: d.deviceSn.trim(),
+      deviceName: d.deviceName.trim(),
+      provider: (d.provider || 'MOCK').trim(),
+      userId
+    })
+    return { ...d, id: Number(saved.id) } as DeviceItem
+  },
+  async toggleDeviceStatus(id: number, deviceStatus: number) {
+    await put(`/admin/v1/devices/${id}/status`, { deviceStatus })
+  },
+  async removeDevice(id: number) {
+    await del(`/admin/v1/devices/${id}`)
   },
   async archiveOf(userId: number) {
     const a = await get<{
@@ -697,5 +762,102 @@ export const aiSceneApi = {
   }
 }
 
+
+/* ---------------- 用户 AI 长期记忆（/admin/v1/users/{id}/chat-memories，契约 4.14 / 4.15） ---------------- */
+
+/** 后端 Long → 字符串（防精度丢失）：只做字符串化，绝不 Number() 成数值参与运算。 */
+function longText(value: string | number | null | undefined): string {
+  return value === null || value === undefined ? '' : String(value)
+}
+
+/** 分页 total 是后端 Long 的字符串形式，转成非负整数喂给分页组件；非法值一律按 0 处理。 */
+function pageTotal(value: string | number | null | undefined): number {
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : 0
+}
+
+function normalizeMemoryRow(row: AiMemoryRawRow): AiMemoryRow {
+  return {
+    ...row,
+    id: longText(row.id),
+    memoryKey: row.memoryKey || '',
+    memoryText: row.memoryText || '',
+    confidence: Number(row.confidence) || 0,
+    sourceSessionId: longText(row.sourceSessionId),
+    updatedAt: row.updatedAt || '',
+    isAuto: row.isAuto === true
+  }
+}
+
+/** 用户 AI 长期记忆：只走真实后端（不参与 Mock 分支）。删除是**逻辑删除全部**，成功后必须重拉列表。 */
+export const aiMemoryApi = {
+  /** 分页查询某用户的长期记忆；id / sourceSessionId / total 都是字符串，页面层只做展示。 */
+  async list(userId: number | string, params: { pageNum: number; pageSize: number }): Promise<AiMemoryPageResult> {
+    requireRemote()
+    const qs = queryString(params)
+    const data = await get<AiMemoryListData | null>(
+      `/admin/v1/users/${encodeURIComponent(String(userId))}/chat-memories${qs ? `?${qs}` : ''}`
+    )
+    return {
+      records: (data?.records || []).filter(Boolean).map(normalizeMemoryRow),
+      total: pageTotal(data?.total)
+    }
+  },
+  /**
+   * 契约 4.15：逻辑删除该用户的**全部**长期记忆（对话记录/对话记忆不受影响）。
+   * 后端会写审计日志，前端删除成功后需要刷新列表。
+   */
+  async removeAll(userId: number | string): Promise<void> {
+    requireRemote()
+    await del<null>(`/admin/v1/users/${encodeURIComponent(String(userId))}/chat-memories`)
+  }
+}
+
+/* ---------------- AI 审计日志（/admin/v1/ops-audit-logs，只读） ---------------- */
+
+function normalizeAuditRow(row: OpsAuditLogRawRow): OpsAuditLogRow {
+  const costMs = Number(row.costMs)
+  const resultCode = Number(row.resultCode)
+  return {
+    ...row,
+    id: longText(row.id),
+    opsId: longText(row.opsId),
+    operatorName: row.operatorName || '',
+    roleCode: row.roleCode || '',
+    moduleCode: row.moduleCode || '',
+    actionCode: row.actionCode || '',
+    actionName: row.actionName || '',
+    targetType: row.targetType || '',
+    targetId: longText(row.targetId),
+    detailJson: row.detailJson || '',
+    requestUri: row.requestUri || '',
+    requestMethod: row.requestMethod || '',
+    clientIp: row.clientIp || '',
+    costMs: row.costMs === null || row.costMs === undefined || !Number.isFinite(costMs) ? null : costMs,
+    resultCode: Number.isFinite(resultCode) ? resultCode : 0,
+    gmtCreate: row.gmtCreate || ''
+  }
+}
+
+/** 审计日志：只读接口，后端未提供修改/删除，页面也不做任何写操作。 */
+export const opsAuditApi = {
+  /** 筛选参数（moduleCode / actionCode / targetType / targetId）全部可空，空值不拼进查询串。 */
+  async list(params: OpsAuditLogQuery = {}): Promise<OpsAuditLogPageResult> {
+    requireRemote()
+    const qs = queryString({
+      moduleCode: params.moduleCode,
+      actionCode: params.actionCode,
+      targetType: params.targetType,
+      targetId: params.targetId,
+      pageNum: params.pageNum,
+      pageSize: params.pageSize
+    })
+    const data = await get<OpsAuditLogListData | null>(`/admin/v1/ops-audit-logs${qs ? `?${qs}` : ''}`)
+    return {
+      records: (data?.records || []).filter(Boolean).map(normalizeAuditRow),
+      total: pageTotal(data?.total)
+    }
+  }
+}
 
 export { resetDb } from '@/mock'
