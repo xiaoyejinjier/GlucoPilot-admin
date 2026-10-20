@@ -7,6 +7,11 @@ export interface FoodImage {
 }
 
 export const foodImageApi = {
+  async review(path: string): Promise<Blob> {
+    if (!/^\/admin\/v1\/foods\/[1-9]\d*\/review-image$/.test(path)) throw new Error('实拍图地址无效')
+    return request<Blob>(path, { responseType: 'blob' })
+  },
+
   async list(): Promise<FoodImage[]> {
     if (adminConfig.useMock) return []
     return get<FoodImage[]>('/admin/v1/food-images')

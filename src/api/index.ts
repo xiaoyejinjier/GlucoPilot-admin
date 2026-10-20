@@ -50,6 +50,7 @@ interface AdminUserRow {
   nickname: string
   avatarText?: string | null
   phoneMasked?: string | null
+  phone?: string | null
   age?: number | null
   diabetesTypeText?: string | null
   accountStatus: number
@@ -99,7 +100,7 @@ function mapUser(row: AdminUserRow): AppUser {
     username: row.username || `user_${row.id}`,
     nickname: row.nickname || `用户#${row.id}`,
     avatarText: row.avatarText || (row.nickname ? row.nickname.slice(0, 1) : '用'),
-    phone: row.phoneMasked || '未绑定',
+    phone: row.phone || row.phoneMasked || '未绑定',
     age: Number(row.age) || 0,
     diabetesType: row.diabetesTypeText || '未填写',
     status: Number(row.accountStatus) === 1 ? 'enabled' : 'disabled',

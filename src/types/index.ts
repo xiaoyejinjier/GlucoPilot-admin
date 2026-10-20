@@ -182,6 +182,7 @@ export interface FoodItem {
   updatedAt: string
   nutritionSource?: 'MANUAL' | 'AI_ESTIMATE' | 'AI_REVIEWED'
   sourceModel?: string | null
+  reviewImage?: string | null // 只读：待审核实拍预览，需运营鉴权
 }
 
 /* ------- 反馈 ------- */

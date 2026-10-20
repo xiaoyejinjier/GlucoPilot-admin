@@ -34,9 +34,10 @@ export const routes: RouteRecordRaw[] = [
     children: [
       { path: 'dashboard', name: 'dashboard', component: () => import('@/views/dashboard/DashboardView.vue'), meta: { title: '数据看板', icon: 'DataBoard', roles: ['admin', 'editor'], permission: 'dashboard:view' } },
       { path: 'content/news', name: 'news', component: () => import('@/views/content/NewsListView.vue'), meta: { title: '资讯管理', icon: 'Document', roles: ['admin', 'editor'], permission: 'content:news:list' } },
+      { path: 'content/community', name: 'community-review', component: () => import('@/views/content/CommunityReviewView.vue'), meta: { title: '文章管理', icon: 'DocumentChecked', roles: ['admin', 'editor'], permission: 'content:news:list' } },
+      { path: 'content/community-reports', name: 'community-reports', component: () => import('@/views/content/CommunityReviewView.vue'), meta: { title: '社区举报管理', icon: 'Warning', roles: ['admin', 'editor'], permission: 'content:news:list' } },
       { path: 'content/news/new', name: 'news-new', component: () => import('@/views/content/NewsEditView.vue'), meta: { title: '新建资讯', roles: ['admin', 'editor'], hidden: true, permission: 'content:news:edit' } },
       { path: 'content/news/:id/edit', name: 'news-edit', component: () => import('@/views/content/NewsEditView.vue'), meta: { title: '编辑资讯', roles: ['admin', 'editor'], hidden: true, permission: 'content:news:edit' } },
-      { path: 'content/banners', name: 'banners', component: () => import('@/views/content/BannerView.vue'), meta: { title: '轮播图管理', icon: 'Picture', roles: ['admin', 'editor'], permission: 'content:banner:manage' } },
       { path: 'content/media', name: 'media', component: () => import('@/views/content/MediaView.vue'), meta: { title: '媒体素材', icon: 'FolderOpened', roles: ['admin', 'editor'], permission: 'content:media:manage' } },
       { path: 'nutrition/foods', name: 'foods', component: () => import('@/views/nutrition/FoodView.vue'), meta: { title: '营养库管理', icon: 'Apple', roles: ['admin', 'editor'], permission: 'food:library:manage' } },
       { path: 'users', name: 'users', component: () => import('@/views/users/UserListView.vue'), meta: { title: '用户管理', icon: 'User', roles: ['admin'], permission: 'user:manage' } },
@@ -91,8 +92,9 @@ export const menuGroups: MenuGroup[] = [
   {
     title: '内容管理', icon: 'Document', roles: ['admin', 'editor'],
     children: [
-      { path: '/content/news', title: '资讯管理', icon: 'Document', permission: 'content:news:list' },
-      { path: '/content/banners', title: '轮播图管理', icon: 'Picture', permission: 'content:banner:manage' },
+      { path: '/content/community', title: '文章管理', icon: 'DocumentChecked', permission: 'content:news:list' },
+      { path: '/content/news', title: '官方资讯编辑', icon: 'Document', permission: 'content:news:list' },
+      { path: '/content/community-reports', title: '社区举报管理', icon: 'Warning', permission: 'content:news:list' },
       { path: '/content/media', title: '媒体素材', icon: 'FolderOpened', permission: 'content:media:manage' }
     ]
   },

@@ -56,7 +56,7 @@
                 </div>
               </div>
               <div class="head-actions">
-                <el-button :icon="Download" size="small" @click="exportArchive">导出档案(演示)</el-button>
+                <el-button v-if="auth.hasPermission('export:task:manage')" :icon="Download" size="small" @click="$router.push('/exports')">查看导出任务</el-button>
               </div>
             </div>
 
@@ -229,17 +229,7 @@ const trendOption = computed<EChartsOption>(() => {
   }
 })
 
-function exportArchive() {
-  if (!archive.value) return
-  const a = document.createElement('a')
-  const content = `用户健康档案导出（${archive.value.owner.nickname}）\n${archive.value.summary}`
-  a.href = URL.createObjectURL(new Blob(['\ufeff' + content], { type: 'text/plain;charset=utf-8' }))
-  a.download = `archive-${archive.value.userId}.txt`
-  a.click()
-  URL.revokeObjectURL(a.href)
-  if (auth.account) api.writeLog(auth.account.username, auth.account.role, '档案', '导出健康档案', `${archive.value.owner.nickname}(${archive.value.userId})`)
-  ElMessage.success('已导出（演示文件）')
-}
+
 </script>
 
 <style scoped>

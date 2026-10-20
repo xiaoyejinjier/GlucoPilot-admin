@@ -26,12 +26,13 @@
               <el-avatar :size="30" class="avatar">{{ row.avatarText }}</el-avatar>
               <div>
                 <div>{{ row.nickname }}</div>
-                <div class="text-muted" style="font-size: 12px">{{ row.phone }}</div>
+
               </div>
             </div>
           </template>
         </el-table-column>
         <el-table-column prop="username" label="用户名" min-width="150" />
+        <el-table-column label="手机号" min-width="150"><template #default="{row}">{{row.phone || '未绑定'}}</template></el-table-column>
         <el-table-column prop="age" label="年龄" width="70" />
         <el-table-column prop="diabetesType" label="类型" width="130" />
         <el-table-column label="记录" width="140">
@@ -50,8 +51,9 @@
           </template>
         </el-table-column>
         <el-table-column prop="registeredAt" label="注册时间" width="170" />
-        <el-table-column label="操作" width="140" fixed="right">
+        <el-table-column label="操作" width="170" fixed="right">
           <template #default="{ row }">
+            <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button v-if="row.status === 'enabled'" link type="danger" @click="toggle(row, false)">禁用</el-button>
             <el-button v-else link type="success" @click="toggle(row, true)">解禁</el-button>
           </template>
@@ -67,11 +69,19 @@
         @page-change="changePage"
       />
     </div>
+    <el-drawer v-model="detailVisible" title="用户详情" :size="560" destroy-on-close>
+      <div v-loading="detailLoading" class="user-detail-content">
+        <el-alert v-if="detailError" :title="detailError" type="error" :closable="false" show-icon />
+        <template v-if="detail"><div class="user-detail-heading"><el-avatar :size="56">{{detail.avatarText || '用'}}</el-avatar><div><h3>{{detail.nickname}}</h3><span>社区号 u{{detail.id}}</span></div><el-tag :type="detail.accountStatus===1?'success':'danger'">{{detail.accountStatus===1?'正常':'已禁用'}}</el-tag></div>
+          <el-descriptions :column="1" border><el-descriptions-item label="用户名">{{detail.username || '未设置'}}</el-descriptions-item><el-descriptions-item label="手机号">{{detail.phone || '未绑定'}}</el-descriptions-item><el-descriptions-item label="年龄">{{detail.age == null ? '未填写' : detail.age+' 岁'}}</el-descriptions-item><el-descriptions-item label="糖尿病类型">{{detail.diabetesTypeText || '未填写'}}</el-descriptions-item><el-descriptions-item label="注册时间">{{detailDate(detail.registeredAt)}}</el-descriptions-item><el-descriptions-item label="最后活跃">{{detailDate(detail.lastActiveAt)}}</el-descriptions-item><el-descriptions-item label="血糖记录">{{detail.recordCount}} 条</el-descriptions-item><el-descriptions-item label="饮食记录">{{detail.mealCount}} 条</el-descriptions-item><el-descriptions-item label="达标率">{{detail.complianceRate}}%</el-descriptions-item></el-descriptions>
+        </template>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive } from 'vue'
+import { onMounted, onBeforeUnmount, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { api } from '@/api'
@@ -79,8 +89,15 @@ import TablePagination from '@/components/TablePagination.vue'
 import { useServerPagination } from '@/composables/useServerPagination'
 import { useAuthStore } from '@/stores/auth'
 import type { AppUser } from '@/types'
+import { userDetailsApi,type UserDetail } from '@/api/users'
+import { getAccessToken } from '@/utils/request'
 
 const auth = useAuthStore()
+const detailVisible=ref(false),detailLoading=ref(false),detailError=ref(''),detail=ref<UserDetail|null>(null)
+let detailRun=0,alive=true
+const detailDate=(value:string|null)=>value?value.replace('T',' ').slice(0,19):'未记录'
+async function openDetail(row:AppUser){const version=++detailRun,token=getAccessToken();detail.value=null;detailError.value='';detailVisible.value=true;detailLoading.value=true;try{const saved=await userDetailsApi.get(row.id);if(alive&&version===detailRun&&token===getAccessToken())detail.value=saved}catch(e){if(alive&&version===detailRun)detailError.value=(e as Error).message||'用户详情读取失败'}finally{if(alive&&version===detailRun)detailLoading.value=false}}
+onBeforeUnmount(()=>{alive=false;++detailRun})
 const q = reactive({ keyword: '', status: '' })
 type UserFilters = { keyword?: string; accountStatus?: number }
 const { page, records: users, loading, pageSummary, load, search: applyFilters, changeSize, changePage } =
@@ -118,4 +135,5 @@ async function toggle(row: AppUser, enabled: boolean) {
 .filter { display: flex; flex: none; flex-wrap: wrap; gap: 10px; align-items: center; }
 .user-cell { display: flex; align-items: center; gap: 8px; }
 .avatar { background: var(--kt-brand); color: #fff; flex: none; }
+.user-detail-content{padding:4px 0;min-height:220px}.user-detail-heading{display:flex;gap:16px;align-items:center;margin:0 0 28px}.user-detail-heading h3{margin:0 0 8px;font-size:21px}.user-detail-heading span{color:var(--kt-muted);font-size:13px}.user-detail-heading .el-tag{margin-left:auto}
 </style>

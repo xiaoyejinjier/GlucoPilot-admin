@@ -97,11 +97,9 @@
             <el-table-column label="食物" min-width="140">
               <template #default="{ row }">
                 <div class="food-cell">
-                  <img
-                    :src="resolveFoodImage(row)"
-                    :alt="`${row.name}图片`"
+                  <FoodPhoto
+                    :food="row"
                     class="food-img"
-                    @error="useFallbackImage($event, row)"
                   />
                   <span class="food-name" :title="row.name">{{ row.name }}</span>
                 </div>
@@ -322,10 +320,10 @@
         /></el-form-item>
         <el-form-item label="图片">
           <div class="food-image-picker">
-            <img
-              :src="resolveFoodImage(foodDialog.form)"
+            <FoodPhoto
+              :food="foodDialog.form"
+              :prefer-review="!imageManuallySelected"
               class="food-preview"
-              alt="食物图片预览"
             />
             <div class="food-image-controls">
               <el-select
@@ -365,7 +363,7 @@
                 </el-button>
               </el-upload>
               <span class="image-tip"
-                >可选择已有图片，或上传 JPG/PNG 图片（不超过 5MB）</span
+                >{{ foodDialog.form.reviewImage && !imageManuallySelected ? '当前优先预览用户实拍；可另选食品库配图' : '可选择已有图片，或上传 JPG/PNG 图片（不超过 5MB）' }}</span
               >
             </div>
           </div>
@@ -420,6 +418,7 @@ import { Delete, Download, Edit, Plus, Search, Upload } from "@element-plus/icon
 import { api } from "@/api";
 import { foodImageApi } from "@/api/food-images";
 import { useAuthStore } from "@/stores/auth";
+import FoodPhoto from "./FoodPhoto.vue";
 import type { FoodCategory, FoodItem } from "@/types";
 import {
   DEFAULT_FOOD_IMAGE,
@@ -510,6 +509,7 @@ const foodDialog = reactive({
     cal: 0,
     gi: null as number | null,
     image: DEFAULT_FOOD_IMAGE,
+    reviewImage: "" as FoodItem["reviewImage"],
     description: "",
     enabled: true,
     updatedAt: "",
@@ -738,9 +738,9 @@ async function removeCategory(c: FoodCategory) {
 }
 
 function openFood(f?: FoodItem) {
-  imageManuallySelected.value = Boolean(f);
+  imageManuallySelected.value = false;
   if (f) {
-    foodDialog.form = { ...f, image: resolveFoodImage(f), nutritionSource: f.nutritionSource || "MANUAL" };
+    foodDialog.form = { ...f, image: resolveFoodImage(f), reviewImage: f.reviewImage || "", nutritionSource: f.nutritionSource || "MANUAL" };
   } else {
     const category =
       categories.value.find((item) => item.id === filterCategory.value) ||
@@ -754,6 +754,7 @@ function openFood(f?: FoodItem) {
       cal: 0,
       gi: null,
       image: getBundledFoodImage("", category?.name),
+      reviewImage: "",
       description: "",
       enabled: true,
       updatedAt: "",
@@ -813,12 +814,6 @@ function onFoodCategoryChange(categoryId: number | string) {
   if (!foodDialog.form.id && !imageManuallySelected.value) {
     foodDialog.form.image = getBundledFoodImage(foodDialog.form.name, category?.name);
   }
-}
-
-function useFallbackImage(event: Event, food: FoodItem) {
-  const image = event.target as HTMLImageElement;
-  const fallback = getBundledFoodImage(food.name, food.categoryName);
-  if (!image.src.endsWith(fallback)) image.src = fallback;
 }
 
 function useCategoryFallback(event: Event, category: FoodCategory) {

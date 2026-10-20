@@ -24,6 +24,7 @@ const DEFAULT_TIMEOUT_MS = 15000
 
 export interface RequestOptions extends RequestInit {
   auth?: boolean
+  responseType?: 'json' | 'blob'
   /**
    * 单次请求超时（毫秒）。默认 15000。
    * 后台"测试连通性"要真的打一次上游模型（后端上限 30s），必须显式放宽，
@@ -41,15 +42,13 @@ export async function request<T>(
   path: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { auth = true, headers, timeout = DEFAULT_TIMEOUT_MS, ...rest } = options
+  const { auth = true, headers, timeout = DEFAULT_TIMEOUT_MS, responseType = 'json', ...rest } = options
   const h = new Headers(headers)
   if (!h.has('Content-Type') && rest.body) {
     h.set('Content-Type', 'application/json')
   }
-  if (auth) {
-    const token = getAccessToken()
-    if (token) h.set('Authorization', `Bearer ${token}`)
-  }
+  const requestToken = auth ? getAccessToken() : ''
+  if (requestToken) h.set('Authorization', `Bearer ${requestToken}`)
 
   const url = path.startsWith('http') ? path : `${adminConfig.baseUrl}${path}`
   const ctrl = new AbortController()
@@ -66,6 +65,12 @@ export async function request<T>(
     window.clearTimeout(timer)
   }
 
+  if (responseType === 'blob' && res.ok && (res.headers.get('Content-Type')?.startsWith('image/') || res.headers.get('Content-Type')?.startsWith('video/mp4') || res.headers.get('Content-Type')?.startsWith('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'))) {
+    const blob = await res.blob()
+    if (auth && requestToken !== getAccessToken()) throw new Error('登录状态已变化，请重新下载')
+    return blob as T
+  }
+
   let body: ApiBody<T> | null = null
   try {
     body = (await res.json()) as ApiBody<T>
@@ -73,9 +78,11 @@ export async function request<T>(
     throw new Error(`请求失败(${res.status})`)
   }
   if (res.status === 401 || body.code === 40100) {
-    clearSessionOnAuthFail()
-    if (!window.location.pathname.startsWith('/login')) {
-      window.location.assign(`/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+    if (auth && getAccessToken() === requestToken) {
+      clearSessionOnAuthFail()
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.assign(`/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+      }
     }
     throw Object.assign(new Error(body.message || '未登录或 Token 失效'), { code: 40100 })
   }
