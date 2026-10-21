@@ -28,11 +28,32 @@
                 <el-radio value="video">视频</el-radio>
               </el-radio-group>
             </el-form-item>
-            <el-form-item v-if="form.type === 'video'" label="视频地址">
-              <el-input v-model="form.videoUrl" placeholder="/video/xxx.mp4 或 https://..." />
+            <el-form-item v-if="form.type === 'video'" label="视频">
+              <el-input v-model="form.videoUrl" placeholder="上传后自动填入 /api/v1/cms/videos/{id}，也可手填外链" />
+              <el-upload
+                class="upload-btn"
+                :show-file-list="false"
+                :http-request="uploadVideo"
+                accept="video/mp4"
+              >
+                <el-button size="small" :loading="videoUploading" style="width: 100%; margin-top: 8px">
+                  上传 MP4（≤100MB）
+                </el-button>
+              </el-upload>
+              <p class="tip text-muted">稳定路径 /api/v1/cms/videos/{id}，走对象存储（local/MinIO）。</p>
             </el-form-item>
             <el-form-item label="正文内容">
-              <el-input v-model="form.content" type="textarea" :rows="14" placeholder="支持多段落文本；富文本编辑器接入后替换为富文本组件" />
+              <div class="rich-wrap">
+                <Toolbar class="rich-toolbar" :editor="editorRef" :defaultConfig="toolbarConfig" mode="default" />
+                <Editor
+                  class="rich-editor"
+                  v-model="form.content"
+                  :defaultConfig="editorConfig"
+                  mode="default"
+                  @onCreated="onEditorCreated"
+                />
+              </div>
+              <p class="tip text-muted">正文存 HTML；插图走 CMS 上传，入库为 /api/v1/cms/images/{id}。</p>
             </el-form-item>
           </el-form>
         </div>
@@ -75,8 +96,7 @@
                 上传封面（JPG/PNG，≤5MB）
               </el-button>
             </el-upload>
-            <el-input v-model="form.coverText" size="small" placeholder="封面角标文字（如 科普）" style="margin-top: 8px" />
-            <p class="tip text-muted">上传走对象存储（local/MinIO/OSS），保存的是稳定路径 /api/v1/cms/images/{id}。</p>
+            <p class="tip text-muted">上传走对象存储（local/MinIO），保存稳定路径 /api/v1/cms/images/{id}。</p>
           </div>
         </div>
         <div class="kt-card">
@@ -93,10 +113,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
+import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
+import type { IDomEditor, IEditorConfig, IToolbarConfig } from '@wangeditor/editor'
+import '@wangeditor/editor/dist/css/style.css'
 import { api } from '@/api'
 import { cmsMediaApi, displayMediaUrl, type CmsMediaOption } from '@/api/cms-media'
 import { useAuthStore } from '@/stores/auth'
@@ -109,7 +132,9 @@ const channels: NewsChannel[] = ['企业动态', '行业快讯', '设备新知',
 
 const saving = ref(false)
 const uploading = ref(false)
+const videoUploading = ref(false)
 const uploadedOptions = ref<CmsMediaOption[]>([])
+const editorRef = shallowRef<IDomEditor>()
 const id = Number(route.params.id || 0)
 const isEdit = computed(() => !!id && id > 0)
 
@@ -134,6 +159,56 @@ const form = reactive<News>({
 
 const coverPreview = computed(() => displayMediaUrl(form.coverUrl))
 
+const toolbarConfig: Partial<IToolbarConfig> = {
+  excludeKeys: ['uploadVideo', 'insertVideo', 'fullScreen']
+}
+
+const editorConfig: Partial<IEditorConfig> = {
+  placeholder: '请输入正文，可排版、插入链接与图片…',
+  MENU_CONF: {
+    uploadImage: {
+      customUpload: async (file: File, insertFn: (url: string, alt?: string, href?: string) => void) => {
+        try {
+          const uploaded = await cmsMediaApi.upload(file, 'news')
+          // 编辑器预览用可访问 URL；入库仍用相对路径（保存时从 HTML 还原）
+          insertFn(uploaded.displayUrl, file.name, uploaded.value)
+          if (!uploadedOptions.value.some((o) => o.value === uploaded.value)) {
+            uploadedOptions.value = [uploaded, ...uploadedOptions.value]
+          }
+        } catch (e) {
+          ElMessage.error((e as Error).message || '正文插图上传失败')
+        }
+      }
+    }
+  }
+}
+
+function onEditorCreated(editor: IDomEditor) {
+  editorRef.value = editor
+}
+
+/** 保存前：把预览用的绝对 CMS 图地址还原为稳定相对路径。 */
+function contentForSave(html: string): string {
+  if (!html) return ''
+  return html.replace(
+    /(src|href)=["']([^"']*\/api\/v1\/cms\/images\/\d+)["']/gi,
+    (_m, attr, path) => {
+      const idx = path.indexOf('/api/v1/cms/images/')
+      const relative = idx >= 0 ? path.slice(idx) : path
+      return `${attr}="${relative}"`
+    }
+  )
+}
+
+/** 加载后：相对路径补成可预览地址。 */
+function contentForEditor(html: string): string {
+  if (!html) return ''
+  return html.replace(
+    /(src|href)=["'](\/api\/v1\/cms\/images\/\d+)["']/gi,
+    (_m, attr, path) => `${attr}="${displayMediaUrl(path)}"`
+  )
+}
+
 async function loadUploaded() {
   try {
     uploadedOptions.value = await cmsMediaApi.listOptions('news')
@@ -148,12 +223,25 @@ async function load() {
   try {
     const list = await api.listNews()
     const target = list.find((n) => n.id === id)
-    if (target) Object.assign(form, target)
+    if (target) {
+      Object.assign(form, target, {
+        coverText: '',
+        content: contentForEditor(target.content || '')
+      })
+    }
   } catch (e) {
     ElMessage.error((e as Error).message || '加载资讯失败')
   }
 }
 onMounted(load)
+
+onBeforeUnmount(() => {
+  const editor = editorRef.value
+  if (editor) {
+    editor.destroy()
+    editorRef.value = undefined
+  }
+})
 
 const statusText = computed(() => (form.status === 'published' ? '已发布' : form.status === 'draft' ? '草稿' : '已下架'))
 
@@ -176,6 +264,22 @@ async function uploadCover(options: { file: File; onSuccess: (body: unknown) => 
   }
 }
 
+async function uploadVideo(options: { file: File; onSuccess: (body: unknown) => void; onError: (e: Error) => void }) {
+  videoUploading.value = true
+  try {
+    const uploaded = await cmsMediaApi.upload(options.file, 'news-video')
+    form.videoUrl = uploaded.value
+    ElMessage.success('视频已上传')
+    options.onSuccess(uploaded)
+  } catch (e) {
+    const err = e as Error
+    ElMessage.error(err.message || '视频上传失败')
+    options.onError(err)
+  } finally {
+    videoUploading.value = false
+  }
+}
+
 async function save(status: NewsStatus) {
   if (!form.title.trim()) {
     ElMessage.warning('请填写标题')
@@ -187,8 +291,21 @@ async function save(status: NewsStatus) {
     if (status === 'published' && !form.publishAt) {
       form.publishAt = new Date().toLocaleString('zh-CN', { hour12: false })
     }
-    const saved = await api.saveNews({ ...form })
-    if (auth.account) api.writeLog(auth.account.username, auth.account.role, '资讯', status === 'published' ? '发布文章' : '保存文章', `《${saved.title}》`)
+    const payload = {
+      ...form,
+      coverText: '',
+      content: contentForSave(form.content)
+    }
+    const saved = await api.saveNews(payload)
+    if (auth.account) {
+      api.writeLog(
+        auth.account.username,
+        auth.account.role,
+        '资讯',
+        status === 'published' ? '发布文章' : '保存文章',
+        `《${saved.title}》`
+      )
+    }
     ElMessage.success(status === 'published' ? '已保存并发布' : '已保存')
     router.push('/content/news')
   } finally {
@@ -204,9 +321,18 @@ async function save(status: NewsStatus) {
 .cover-box { width: 100%; height: 150px; border: 1px dashed var(--kt-line); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #fafafa; margin-bottom: 10px; }
 .cover-img { width: 100%; height: 100%; object-fit: cover; }
 .cover-empty { color: var(--kt-muted); font-size: 13px; }
-.cover-upload { margin-top: 8px; }
 .tip { font-size: 12px; margin-top: 10px; }
 .option-row { display: flex; align-items: center; gap: 8px; }
 .option-thumb { width: 36px; height: 24px; object-fit: cover; border-radius: 4px; border: 1px solid var(--kt-line); }
 .upload-btn { width: 100%; display: block; }
+.rich-wrap {
+  border: 1px solid var(--kt-line);
+  border-radius: 8px;
+  overflow: hidden;
+  width: 100%;
+  background: #fff;
+}
+.rich-toolbar { border-bottom: 1px solid var(--kt-line); }
+.rich-editor { min-height: 320px; }
+.rich-editor :deep(.w-e-text-container) { min-height: 320px !important; }
 </style>

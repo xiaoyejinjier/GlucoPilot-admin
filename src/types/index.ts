@@ -148,7 +148,7 @@ export interface Banner {
   remark: string
 }
 
-export type MediaBizType = 'news' | 'banner' | 'meal_photo' | 'avatar'
+export type MediaBizType = 'news' | 'banner' | 'news-video' | 'meal_photo' | 'avatar'
 export interface MediaFile {
   id: number
   name: string

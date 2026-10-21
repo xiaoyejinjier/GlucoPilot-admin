@@ -1,9 +1,11 @@
-# 接口契约来源
+# API 契约来源说明
 
 权威仓库：https://github.com/xiaoyejinjier/GlucoPilot-backend
 权威文件：docs/API-CONTRACT.md
 调用方发布前应在验收记录中登记对应后端提交 SHA 和镜像标签。
 用户端 /api/v1/**，管理端 /admin/v1/**；响应 { code, message, data, requestId }，成功码 0。
+
+2026-10-21：内容媒体增加 `news-video`（MP4≤100MB）与公开读 `/api/v1/cms/videos/{id}`；开发态 MinIO 上传走同源代理 `/api/v1/media-files/minio-uploads/{token}`；部署默认 MinIO；资讯正文 `contentBody` 为 HTML（管理端 wangEditor），小程序详情 `rich-text` 渲染。purpose：`news` / `banner`（JPG/PNG≤5MB）、`news-video`。
 
 2026-10-20 V35：文章详情增加videos:[{mediaId}]，GET /admin/v1/community/articles/{id}/videos/{mediaId}要求content:news:list且验证文章关联，成功为no-store鉴权video/mp4二进制，失败仍ApiResponse。Blob仅供当前账号/文章临时播放，管理员核验视频后终审，AI初审不覆盖媒体。完整契约见“回复、投稿媒体与用户主页”。
 
@@ -21,4 +23,4 @@
 
 2026-10-20：食品DTO新增只读reviewImage，待审核列表及编辑预览优先用户实拍。通过GET /admin/v1/foods/{id}/review-image携带运营Bearer读取图片二进制，缺失时回落原配图；reviewImage与Blob临时地址不得写入食品公开image字段。依赖后端V30来源照片关联迁移，详见权威契约“管理端食物图片”。
 
-内容媒体：`/admin/v1/cms-media*` + 公开读 `/api/v1/cms/images/{id}`（对象存储 local/MinIO/OSS）。
+内容媒体：`/admin/v1/cms-media*` + 公开读 `/api/v1/cms/images/{id}`、`/api/v1/cms/videos/{id}`（默认 MinIO；local 联调亦可）。

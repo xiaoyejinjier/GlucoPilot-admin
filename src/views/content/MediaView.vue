@@ -5,7 +5,11 @@
         <el-select v-model="biz" style="width: 170px" @change="load">
           <el-option v-for="b in bizTypes" :key="b.value" :label="b.label" :value="b.value" />
         </el-select>
-        <el-upload :show-file-list="false" :http-request="doUpload" accept="image/jpeg,image/png">
+        <el-upload
+          :show-file-list="false"
+          :http-request="doUpload"
+          :accept="biz === 'news-video' ? 'video/mp4' : 'image/jpeg,image/png'"
+        >
           <el-button type="primary" :icon="Upload" :loading="uploading" :disabled="biz === 'all'">上传素材</el-button>
         </el-upload>
         <span class="text-muted tip">{{ tip }}</span>
@@ -14,8 +18,11 @@
 
     <div class="kt-card">
       <el-table :data="list" v-loading="loading">
-        <el-table-column label="缩略图" width="110">
-          <template #default="{ row }"><img :src="row.url" class="thumb" /></template>
+        <el-table-column label="预览" width="110">
+          <template #default="{ row }">
+            <video v-if="row.mime === 'video/mp4'" :src="row.url" class="thumb" muted />
+            <img v-else :src="row.url" class="thumb" />
+          </template>
         </el-table-column>
         <el-table-column prop="name" label="文件名称" min-width="220" />
         <el-table-column label="用途" width="120">
@@ -41,7 +48,7 @@
 <script setup lang="ts">
 /**
  * 内容媒体素材页：对接 /admin/v1/cms-media，对象存储可为 local / MinIO / OSS。
- * 上传前须选定资讯配图或轮播图用途；列表缩略图走稳定地址 /api/v1/cms/images/{id}。
+ * 上传前须选定用途；图 /api/v1/cms/images/{id}，视频 /api/v1/cms/videos/{id}。
  */
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -54,7 +61,8 @@ import type { MediaBizType, MediaFile } from '@/types'
 const bizTypes = [
   { value: 'all' as const, label: '全部用途' },
   { value: 'news' as const, label: '资讯配图' },
-  { value: 'banner' as const, label: '轮播图' }
+  { value: 'banner' as const, label: '轮播图' },
+  { value: 'news-video' as const, label: '资讯视频' }
 ]
 const biz = ref<'all' | CmsMediaPurpose>('all')
 const list = ref<MediaFile[]>([])
@@ -63,8 +71,9 @@ const uploading = ref(false)
 
 const tip = computed(() => {
   if (adminConfig.useMock) return '演示模式未接通对象存储，请关闭 Mock 后使用'
-  if (biz.value === 'all') return '请先选择「资讯配图」或「轮播图」再上传；存储走后端 local/MinIO/OSS'
-  return 'JPG/PNG，最大 5MB；凭证直传对象存储后登记，稳定地址 /api/v1/cms/images/{id}'
+  if (biz.value === 'all') return '请先选择用途再上传；存储走后端 local/MinIO/OSS'
+  if (biz.value === 'news-video') return 'MP4，最大 100MB；稳定地址 /api/v1/cms/videos/{id}'
+  return 'JPG/PNG，最大 5MB；稳定地址 /api/v1/cms/images/{id}'
 })
 
 async function load() {
@@ -86,7 +95,7 @@ function bizLabel(t: MediaBizType) {
 
 async function doUpload(options: { file: File; onSuccess: (body: unknown) => void; onError: (e: Error) => void }) {
   if (biz.value === 'all') {
-    ElMessage.warning('请先选择资讯配图或轮播图')
+    ElMessage.warning('请先选择资讯配图、轮播图或资讯视频')
     options.onError(new Error('未选择用途'))
     return
   }

@@ -1,16 +1,15 @@
 /**
- * 内容媒体（资讯配图 / 轮播图）API。
- * 上传流程与食物图片一致：凭证 → 直传对象存储（local/MinIO/OSS）→ 登记。
- * 持久化到资讯 coverUrl / 轮播 image 时保存稳定相对路径 /api/v1/cms/images/{id}。
+ * 内容媒体（资讯配图 / 轮播图 / 资讯视频）API。
+ * 上传：凭证 → PUT（local 或 minio 同源代理）→ 登记。
+ * 图：/api/v1/cms/images/{id}；视频：/api/v1/cms/videos/{id}。
  */
 import { adminConfig } from '@/config'
 import { del, get, post, request } from '@/utils/request'
 import type { MediaBizType, MediaFile } from '@/types'
 
-/** 后端 purpose：资讯配图 / 轮播图 */
-export type CmsMediaPurpose = 'news' | 'banner'
+/** 后端 purpose */
+export type CmsMediaPurpose = 'news' | 'banner' | 'news-video'
 
-/** 后端 CmsMediaDtos.MediaItem */
 export interface CmsMediaItem {
   id: string
   purpose: CmsMediaPurpose
@@ -23,7 +22,6 @@ export interface CmsMediaItem {
   createdAt?: string
 }
 
-/** 下拉选项：value 为入库用的相对路径，displayUrl 用于预览。 */
 export interface CmsMediaOption {
   id: number
   label: string
@@ -31,15 +29,20 @@ export interface CmsMediaOption {
   displayUrl: string
 }
 
-/** 相对路径补上管理端 baseUrl，便于缩略图展示。 */
 export function displayMediaUrl(fileUrl: string): string {
   if (!fileUrl) return ''
   if (/^https?:\/\//i.test(fileUrl)) return fileUrl
   return `${adminConfig.baseUrl}${fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`}`
 }
 
+function purposeLabel(purpose: CmsMediaPurpose): string {
+  if (purpose === 'banner') return '轮播'
+  if (purpose === 'news-video') return '资讯视频'
+  return '资讯'
+}
+
 function toMediaFile(item: CmsMediaItem): MediaFile {
-  const ext = item.mimeType === 'image/png' ? 'png' : 'jpg'
+  const ext = item.mimeType === 'video/mp4' ? 'mp4' : item.mimeType === 'image/png' ? 'png' : 'jpg'
   return {
     id: Number(item.id),
     name: `${item.purpose}-${item.id}.${ext}`,
@@ -55,10 +58,21 @@ function toMediaFile(item: CmsMediaItem): MediaFile {
 function toOption(item: CmsMediaItem): CmsMediaOption {
   return {
     id: Number(item.id),
-    label: `${item.purpose === 'banner' ? '轮播' : '资讯'} #${item.id}`,
+    label: `${purposeLabel(item.purpose)} #${item.id}`,
     value: item.fileUrl,
     displayUrl: displayMediaUrl(item.fileUrl)
   }
+}
+
+function resolveUploadUrl(uploadUrl: string): string {
+  const localPath = new URL(uploadUrl, window.location.origin).pathname
+  if (
+    localPath.startsWith('/api/v1/media-files/local-uploads/') ||
+    localPath.startsWith('/api/v1/media-files/minio-uploads/')
+  ) {
+    return `${adminConfig.baseUrl}${localPath}`
+  }
+  return uploadUrl
 }
 
 async function fetchItems(purpose?: CmsMediaPurpose | 'all'): Promise<CmsMediaItem[]> {
@@ -68,36 +82,38 @@ async function fetchItems(purpose?: CmsMediaPurpose | 'all'): Promise<CmsMediaIt
 }
 
 export const cmsMediaApi = {
-  /** 列出已登记素材（媒体页表格）。 */
   async list(purpose?: CmsMediaPurpose | 'all'): Promise<MediaFile[]> {
     return (await fetchItems(purpose)).map(toMediaFile)
   },
 
-  /** 列出可选图片（资讯封面 / 轮播选择器）。 */
   async listOptions(purpose: CmsMediaPurpose): Promise<CmsMediaOption[]> {
     return (await fetchItems(purpose)).map(toOption)
   },
 
   /**
-   * 上传 JPG/PNG（≤5MB），返回入库用相对路径。
-   * MinIO 场景下 uploadUrl 为预签名地址，原样 PUT；local 场景走同源代理路径。
+   * 上传 JPG/PNG（≤5MB）或 MP4（purpose=news-video，≤100MB）。
    */
   async upload(file: File, purpose: CmsMediaPurpose): Promise<CmsMediaOption> {
-    if (adminConfig.useMock) throw new Error('上传内容图片需要连接后端，请关闭演示模式')
-    if (!['image/jpeg', 'image/png'].includes(file.type)) throw new Error('请选择 JPG 或 PNG 图片')
-    if (!file.size || file.size > 5 * 1024 * 1024) throw new Error('图片大小不能超过 5MB')
+    if (adminConfig.useMock) throw new Error('上传内容媒体需要连接后端，请关闭演示模式')
+
+    const isVideo = purpose === 'news-video'
+    if (isVideo) {
+      if (file.type !== 'video/mp4') throw new Error('请选择 MP4 视频')
+      if (!file.size || file.size > 100 * 1024 * 1024) throw new Error('视频大小不能超过 100MB')
+    } else {
+      if (!['image/jpeg', 'image/png'].includes(file.type)) throw new Error('请选择 JPG 或 PNG 图片')
+      if (!file.size || file.size > 5 * 1024 * 1024) throw new Error('图片大小不能超过 5MB')
+    }
 
     const body = { purpose, bizType: 5, mimeType: file.type, sizeBytes: file.size }
     const credential = await post<{ uploadUrl: string; storageKey: string; expireIn: number }>(
       '/admin/v1/cms-media/upload-credentials',
       body
     )
-    const localPath = new URL(credential.uploadUrl, window.location.origin).pathname
-    const uploadUrl = localPath.startsWith('/api/v1/media-files/local-uploads/')
-      ? `${adminConfig.baseUrl}${localPath}`
-      : credential.uploadUrl
+    const uploadUrl = resolveUploadUrl(credential.uploadUrl)
+    const timeoutMs = isVideo ? 300000 : 60000
     const controller = new AbortController()
-    const timer = window.setTimeout(() => controller.abort(), 60000)
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs)
     try {
       const response = await fetch(uploadUrl, {
         method: 'PUT',
@@ -105,9 +121,9 @@ export const cmsMediaApi = {
         headers: { 'Content-Type': 'application/octet-stream' },
         signal: controller.signal
       })
-      if (!response.ok) throw new Error(`图片上传失败 (${response.status})，请重新选择`)
+      if (!response.ok) throw new Error(`上传失败 (${response.status})，请重新选择`)
     } catch (error) {
-      if ((error as Error).name === 'AbortError') throw new Error('图片上传超时，请重新选择')
+      if ((error as Error).name === 'AbortError') throw new Error('上传超时，请重新选择')
       throw error
     } finally {
       window.clearTimeout(timer)
@@ -124,9 +140,8 @@ export const cmsMediaApi = {
     return toOption(saved)
   },
 
-  /** 软删除素材。 */
   async remove(id: number): Promise<void> {
-    if (adminConfig.useMock) throw new Error('删除内容图片需要连接后端，请关闭演示模式')
+    if (adminConfig.useMock) throw new Error('删除内容媒体需要连接后端，请关闭演示模式')
     await del(`/admin/v1/cms-media/${id}`)
   }
 }
