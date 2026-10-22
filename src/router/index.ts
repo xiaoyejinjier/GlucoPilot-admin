@@ -60,7 +60,7 @@ export const routes: RouteRecordRaw[] = [
       { path: 'monitor/online', name: 'monitor-online', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '在线用户', icon: 'User', roles: ['admin'], permission: 'monitor:online:list', ruoyiMonitor: 'online' } },
       { path: 'monitor/login-logs', name: 'monitor-login-logs', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '登录日志', icon: 'Tickets', roles: ['admin'], permission: 'monitor:logininfor:list', ruoyiMonitor: 'login-logs' } },
       { path: 'monitor/oper-logs', name: 'monitor-oper-logs', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '操作日志', icon: 'Document', roles: ['admin'], permission: 'monitor:operlog:list', ruoyiMonitor: 'oper-logs' } },
-      { path: 'monitor/server', name: 'monitor-server', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '服务监控', icon: 'Cpu', roles: ['admin'], permission: 'monitor:server:list', ruoyiMonitor: 'server' } },
+      { path: 'monitor/server', name: 'monitor-server', component: () => import('@/views/system/ServerResourcesView.vue'), meta: { title: '服务器资源', icon: 'Cpu', roles: ['admin'], permission: 'monitor:server:list', ruoyiMonitor: 'server' } },
       { path: 'monitor/cache', name: 'monitor-cache', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '缓存监控', icon: 'Coin', roles: ['admin'], permission: 'monitor:cache:manage', ruoyiMonitor: 'cache' } },
       { path: 'monitor/jobs', name: 'monitor-jobs', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '定时任务', icon: 'Clock', roles: ['admin'], permission: 'monitor:job:manage', ruoyiResource: 'jobs' } },
       { path: 'monitor/job-logs', name: 'monitor-job-logs', component: () => import('@/views/system/RuoYiMonitorView.vue'), meta: { title: '任务日志', icon: 'List', roles: ['admin'], permission: 'monitor:job:manage', ruoyiMonitor: 'job-logs' } },
@@ -134,7 +134,7 @@ export const menuGroups: MenuGroup[] = [
       { path: '/monitor/login-logs', title: '登录日志', icon: 'Tickets', permission: 'monitor:logininfor:list' },
       { path: '/monitor/oper-logs', title: '操作日志', icon: 'Document', permission: 'monitor:operlog:list' },
       { path: '/system/audit-logs', title: 'AI 审计日志', icon: 'DocumentChecked', permission: 'ai:audit:view' },
-      { path: '/monitor/server', title: '服务监控', icon: 'Cpu', permission: 'monitor:server:list' },
+      { path: '/monitor/server', title: '服务器资源', icon: 'Cpu', permission: 'monitor:server:list' },
       { path: '/monitor/cache', title: '缓存监控', icon: 'Coin', permission: 'monitor:cache:manage' },
       { path: '/monitor/jobs', title: '定时任务', icon: 'Clock', permission: 'monitor:job:manage' },
       { path: '/monitor/job-logs', title: '任务日志', icon: 'List', permission: 'monitor:job:manage' }
