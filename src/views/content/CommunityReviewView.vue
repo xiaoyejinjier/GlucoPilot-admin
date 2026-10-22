@@ -80,7 +80,20 @@ const articles = ref<CommunityArticle[]>([]), reports = ref<CommunityReport[]>([
 const drawer = ref(false), detailLoading = ref(false), detailError = ref(''), saving = ref(false), note = ref(''), resolution = ref('DISMISS')
 const selectedArticle = ref<CommunityArticle | null>(null), selectedReport = ref<CommunityReport | null>(null)
 let listRun = 0, detailRun = 0
-function date(value?: string) { return value ? String(value).replace('T',' ').slice(0,16) : '—' }
+function date(value?: string | number | Date) {
+  if (value == null || value === '') return '—'
+  if (typeof value === 'number') {
+    const ms = value < 1e12 ? value * 1000 : value
+    const d = new Date(ms)
+    return Number.isNaN(d.getTime()) ? '—' : d.toISOString().replace('T', ' ').slice(0, 16)
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? '—' : value.toISOString().replace('T', ' ').slice(0, 16)
+  }
+  const raw = String(value).trim()
+  if (/^\d{10,13}$/.test(raw)) return date(Number(raw))
+  return raw.replace('T', ' ').slice(0, 16)
+}
 function aiText(value: string) { return ({ PASS:'初审通过', REJECT:'建议驳回', ERROR:'初审异常', PENDING:'等待初审' } as Record<string,string>)[value] || '初审中' }
 function stateTone(value: string): 'success' | 'warning' | 'danger' | 'info' { return value === 'PUBLISHED' ? 'success' : value === 'PENDING_ADMIN' ? 'warning' : ['AI_REJECTED','AI_ERROR','REJECTED'].includes(value) ? 'danger' : 'info' }
 async function load() {
