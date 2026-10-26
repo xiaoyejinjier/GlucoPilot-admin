@@ -51,6 +51,7 @@
           </el-breadcrumb>
         </div>
         <div class="header-right">
+          <WorkReminders />
           <!-- 主题切换：与小程序 display-settings 的三主题对齐 -->
           <el-dropdown trigger="click" @command="changeTheme">
             <span class="header-action">
@@ -93,6 +94,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import WorkReminders from '@/components/WorkReminders.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAppStore } from '@/stores/app'

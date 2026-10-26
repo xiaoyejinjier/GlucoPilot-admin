@@ -8,15 +8,15 @@ const deferred = () => {let resolve;const promise = new Promise(r=>{resolve=r});
 const report={id:'9',target_type:'ARTICLE',target_id:'7',reason:'MISINFORMATION',details:'内容存在问题',state:'OPEN',reporter_id:'2',target_content:'被举报的文章正文'}
 const article={id:'7',title:'投稿文章',source:'COMMUNITY',author:{nickname:'用户小明',key:'u2'},state:'PENDING_ADMIN',revision:3,aiVerdict:'PASS',body:'文章正文',tags:[]}
 function page(options={}) {
-  const state={calls:[],warnings:[],successes:[],errors:[]}, route={path:options.path || '/content/community'}
+  const state={calls:[],warnings:[],successes:[],errors:[],reminderRefreshes:0,watchers:[]}, route={path:options.path || '/content/community',query:{}}
   const auth={role:options.role || 'admin',hasPermission:()=>options.permission !== false}
   const defaults={articles:async()=>({records:[article],total:1}),reports:async()=>({records:[report],total:1}),article:async()=>({...article}),review:async()=>({...article,state:'PUBLISHED'}),resolve:async()=>({}),...options.api}
   const api=new Proxy({}, {get:(_t,key)=>(...args)=>{state.calls.push({key,args});return defaults[key](...args)}})
   const deps={
-    vue:{ref:v=>({value:v}),computed:get=>({get value(){return get()}}),watch:(_get,callback,opts)=>{if(opts?.immediate)callback()},onBeforeUnmount(){}},
+    vue:{ref:v=>({value:v}),computed:get=>({get value(){return get()}}),watch:(get,callback,opts)=>{state.watchers.push({get,callback});if(opts?.immediate)callback()},onBeforeUnmount(){}},
     'vue-router':{useRoute:()=>route,useRouter:()=>({push(){}})},
     'element-plus':{ElMessage:{warning:v=>state.warnings.push(v),success:v=>state.successes.push(v),error:v=>state.errors.push(v)},ElMessageBox:{confirm:options.confirm || (async()=>true)}},
-    '@element-plus/icons-vue':{}, '@/api/community':{communityApi:api}, '@/stores/auth':{useAuthStore:()=>auth}
+    '@element-plus/icons-vue':{}, '@/api/community':{communityApi:api}, '@/stores/auth':{useAuthStore:()=>auth}, '@/utils/work-reminders':{refreshWorkReminders:()=>state.reminderRefreshes++}
   }
   const script=parse(fs.readFileSync(path.join(root,'src/views/content/CommunityReviewView.vue'),'utf8')).descriptor.scriptSetup.content
   const module={exports:{}}
@@ -34,6 +34,7 @@ test('管理员能读取举报原文并提交带原因的精确处理，空说�
   p.note.value='核查后确认内容存在误导';p.resolution.value='HIDE_ARTICLE';await p.resolveReport()
   const call=p.state.calls.find(c=>c.key==='resolve');assert.deepEqual(call.args,['9','HIDE_ARTICLE','核查后确认内容存在误导'])
   assert.equal(p.drawer.value,false);assert.equal(p.state.successes.length,1)
+  assert.equal(p.state.reminderRefreshes,1)
 })
 
 test('文章管理默认读取全部状态与来源，按发布人搜索时回到第一页',async()=>{
@@ -43,6 +44,12 @@ test('文章管理默认读取全部状态与来源，按发布人搜索时回�
   p.pageNum.value=3;p.source.value='COMMUNITY';p.keyword.value='小明';p.status.value='PUBLISHED';p.search();await flush()
   assert.deepEqual(p.state.calls.filter(c=>c.key==='articles').at(-1).args,['PUBLISHED',1,'COMMUNITY','小明'])
   p.resetFilters();await flush();assert.deepEqual(p.state.calls.filter(c=>c.key==='articles').at(-1).args,['',1,'',''])
+})
+
+test('停留举报页面时再次点击全局提醒，恢复待处理筛选并回第一页',async()=>{
+  const p=page({path:'/content/community-reports'});await flush();p.status.value='DISMISSED';p.pageNum.value=7;p.drawer.value=true;p.route.query.reminder='next'
+  const watcher=p.state.watchers.find(w=>typeof w.get==='function'&&w.get()==='next');assert.ok(watcher);watcher.callback('next');await flush()
+  assert.equal(p.status.value,'OPEN');assert.equal(p.pageNum.value,1);assert.equal(p.drawer.value,false);assert.deepEqual(p.state.calls.filter(call=>call.key==='reports').at(-1).args,['OPEN',1])
 })
 
 test('官方文章只能走官方编辑，不通过投稿终审接口处理',async()=>{

@@ -65,6 +65,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { communityApi, type CommunityArticle, type CommunityReport } from '@/api/community'
 import { useAuthStore } from '@/stores/auth'
+import { refreshWorkReminders } from '@/utils/work-reminders'
 import ArticlePhoto from './ArticlePhoto.vue'
 
 const route = useRoute(), router = useRouter(), auth = useAuthStore()
@@ -135,11 +136,12 @@ async function resolveReport() {
   const report = selectedReport.value, action = resolution.value, resolutionNote = note.value.trim()
   saving.value = true
   try { await ElMessageBox.confirm('确认保存并将处理说明反馈给举报人？', '处理举报', {type:'warning'}) } catch { saving.value = false; return }
-  try { if (!canReview.value) return; await communityApi.resolve(report.id,action,resolutionNote); drawer.value = false; ElMessage.success('处理结果已保存，举报人将收到反馈提醒'); await load() }
+  try { if (!canReview.value) return; await communityApi.resolve(report.id,action,resolutionNote); refreshWorkReminders(); drawer.value = false; ElMessage.success('处理结果已保存，举报人将收到反馈提醒'); await load() }
   catch (e) { ElMessage.error((e as Error).message || '处理失败，请重试') }
   finally { saving.value = false }
 }
 watch(reportMode, () => { ++detailRun; drawer.value = false; status.value = reportMode.value ? 'OPEN' : ''; source.value = ''; keyword.value = ''; pageNum.value = 1; total.value = 0; articles.value = []; reports.value = []; load() }, { immediate:true })
+watch(() => route.query.reminder, value => { if (value && reportMode.value) { drawer.value = false; status.value = 'OPEN'; source.value = ''; keyword.value = ''; search() } })
 watch(drawer, visible => { if (!visible) ++detailRun })
 onBeforeUnmount(() => { ++listRun; ++detailRun })
 </script>

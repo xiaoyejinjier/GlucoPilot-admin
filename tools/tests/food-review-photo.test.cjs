@@ -100,10 +100,10 @@ test('审核原图使用Bearer读取二进制，401仍走统一鉴权失败处�
   assert.equal(denied.values.has('kt_admin_token'), false)
 })
 
-test('真实XLSX导出下载保留二进制，业务失败仍解析ApiResponse且不伪装文件',async()=>{
-  const mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  const good=requester(new Response(new Blob([new Uint8Array([80,75,3,4])]),{headers:{'Content-Type':mime}}))
-  const blob=await good.request('/admin/v1/exports/7/file',{responseType:'blob'});assert.deepEqual(Array.from(new Uint8Array(await blob.arrayBuffer())),[80,75,3,4]);assert.equal(good.calls[0].options.headers.get('Authorization'),'Bearer admin-token')
+test('真实PDF导出下载保留二进制，业务失败仍解析ApiResponse且不伪装文件',async()=>{
+  const mime='application/pdf'
+  const good=requester(new Response(new Blob([new Uint8Array([37,80,68,70,45])]),{headers:{'Content-Type':mime}}))
+  const blob=await good.request('/admin/v1/exports/7/file',{responseType:'blob'});assert.deepEqual(Array.from(new Uint8Array(await blob.arrayBuffer())),[37,80,68,70,45]);assert.equal(good.calls[0].options.headers.get('Authorization'),'Bearer admin-token')
   const waiting=requester(new Response(JSON.stringify({code:40900,message:'文件尚未就绪'}),{status:409,headers:{'Content-Type':'application/json'}}))
   await assert.rejects(waiting.request('/admin/v1/exports/7/file',{responseType:'blob'}),error=>error.code===40900)
   let resolve

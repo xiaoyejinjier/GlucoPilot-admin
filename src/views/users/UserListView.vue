@@ -74,7 +74,7 @@
     <el-drawer v-model="detailVisible" title="用户详情" :size="560" destroy-on-close>
       <div v-loading="detailLoading" class="user-detail-content">
         <el-alert v-if="detailError" :title="detailError" type="error" :closable="false" show-icon />
-        <template v-if="detail"><div class="user-detail-heading"><el-avatar :size="56">{{detail.avatarText || '用'}}</el-avatar><div><h3>{{detail.nickname}}</h3><span>社区号 u{{detail.id}}</span></div><el-tag :type="detail.accountStatus===1?'success':'danger'">{{detail.accountStatus===1?'正常':'已禁用'}}</el-tag></div>
+        <template v-if="detail"><div class="user-detail-heading"><el-avatar :size="56">{{detail.avatarText || '用'}}</el-avatar><div><h3>{{detail.nickname}}</h3></div><el-tag :type="detail.accountStatus===1?'success':'danger'">{{detail.accountStatus===1?'正常':'已禁用'}}</el-tag></div>
           <el-descriptions :column="1" border><el-descriptions-item label="用户名">{{detail.username || '未设置'}}</el-descriptions-item><el-descriptions-item label="手机号">{{detail.phone || '未绑定'}}</el-descriptions-item><el-descriptions-item label="年龄">{{detail.age == null ? '未填写' : detail.age+' 岁'}}</el-descriptions-item><el-descriptions-item label="糖尿病类型">{{detail.diabetesTypeText || '未填写'}}</el-descriptions-item><el-descriptions-item label="注册时间">{{detailDate(detail.registeredAt)}}</el-descriptions-item><el-descriptions-item label="最后活跃">{{detailDate(detail.lastActiveAt)}}</el-descriptions-item><el-descriptions-item label="血糖记录">{{detail.recordCount}} 条</el-descriptions-item><el-descriptions-item label="饮食记录">{{detail.mealCount}} 条</el-descriptions-item><el-descriptions-item label="达标率">{{detail.complianceRate}}%</el-descriptions-item></el-descriptions>
         </template>
       </div>

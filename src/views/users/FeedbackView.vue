@@ -84,16 +84,19 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import { api } from '@/api'
 import TablePagination from '@/components/TablePagination.vue'
 import { useServerPagination } from '@/composables/useServerPagination'
 import { useAuthStore } from '@/stores/auth'
+import { refreshWorkReminders } from '@/utils/work-reminders'
 import type { Feedback, FeedbackStatus, FeedbackType } from '@/types'
 
 const auth = useAuthStore()
+const route = useRoute()
 const types: FeedbackType[] = ['产品建议', 'Bug问题', '功能诉求', '其他']
 const saving = ref(false)
 const q = reactive({ type: '' as FeedbackType | '', status: '' as FeedbackStatus | '', keyword: '' })
@@ -103,7 +106,12 @@ const { page, records: list, loading, pageSummary, load, search: applyFilters, c
 const dialog = reactive<{ visible: boolean; row: Feedback | null }>({ visible: false, row: null })
 const form = reactive({ status: 'received' as FeedbackStatus, reply: '' })
 
-onMounted(load)
+watch(() => route.query.reminder, value => {
+  if (value) {
+    q.type = ''; q.keyword = ''; q.status = 'received'
+    void search()
+  } else void load()
+}, { immediate: true })
 
 function search() {
   return applyFilters({
@@ -143,6 +151,7 @@ async function saveReply() {
   saving.value = true
   try {
     await api.replyFeedback(dialog.row.id, form.reply, form.status)
+    refreshWorkReminders()
     if (auth.account) api.writeLog(auth.account.username, auth.account.role, '反馈', '处理反馈', `#${dialog.row.id} → ${statusText(form.status)}`)
     dialog.visible = false
     ElMessage.success('审批结果已回写，用户端可在“我的反馈”查看')

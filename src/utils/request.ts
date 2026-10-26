@@ -65,7 +65,7 @@ export async function request<T>(
     window.clearTimeout(timer)
   }
 
-  if (responseType === 'blob' && res.ok && (res.headers.get('Content-Type')?.startsWith('image/') || res.headers.get('Content-Type')?.startsWith('video/mp4') || res.headers.get('Content-Type')?.startsWith('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'))) {
+  if (responseType === 'blob' && res.ok && (res.headers.get('Content-Type')?.startsWith('image/') || res.headers.get('Content-Type')?.startsWith('video/mp4') || res.headers.get('Content-Type')?.startsWith('application/pdf') || res.headers.get('Content-Type')?.startsWith('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'))) {
     const blob = await res.blob()
     if (auth && requestToken !== getAccessToken()) throw new Error('登录状态已变化，请重新下载')
     return blob as T
