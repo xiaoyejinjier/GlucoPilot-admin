@@ -36,6 +36,7 @@ export const routes: RouteRecordRaw[] = [
       { path: 'content/news', name: 'news', component: () => import('@/views/content/NewsListView.vue'), meta: { title: '资讯管理', icon: 'Document', roles: ['admin', 'editor'], permission: 'content:news:list' } },
       { path: 'content/community', name: 'community-review', component: () => import('@/views/content/CommunityReviewView.vue'), meta: { title: '文章管理', icon: 'DocumentChecked', roles: ['admin', 'editor'], permission: 'content:news:list' } },
       { path: 'content/community-reports', name: 'community-reports', component: () => import('@/views/content/CommunityReviewView.vue'), meta: { title: '社区举报管理', icon: 'Warning', roles: ['admin', 'editor'], permission: 'content:news:list' } },
+      { path: 'content/community-comments', name: 'community-comments', component: () => import('@/views/content/CommunityCommentsView.vue'), meta: { title: '社区评论管理', icon: 'ChatDotSquare', roles: ['admin', 'editor'], permission: 'content:news:list' } },
       { path: 'content/community-tags', name: 'community-tags', component: () => import('@/views/content/CommunityTagsView.vue'), meta: { title: '社区标签管理', icon: 'CollectionTag', roles: ['admin', 'editor'], permission: 'content:news:list' } },
       { path: 'content/news/new', name: 'news-new', component: () => import('@/views/content/NewsEditView.vue'), meta: { title: '新建资讯', roles: ['admin', 'editor'], hidden: true, permission: 'content:news:edit' } },
       { path: 'content/news/:id/edit', name: 'news-edit', component: () => import('@/views/content/NewsEditView.vue'), meta: { title: '编辑资讯', roles: ['admin', 'editor'], hidden: true, permission: 'content:news:edit' } },
@@ -98,6 +99,7 @@ export const menuGroups: MenuGroup[] = [
       { path: '/content/community', title: '文章管理', icon: 'DocumentChecked', permission: 'content:news:list' },
       { path: '/content/news', title: '官方资讯编辑', icon: 'Document', permission: 'content:news:list' },
       { path: '/content/community-reports', title: '社区举报管理', icon: 'Warning', permission: 'content:news:list' },
+      { path: '/content/community-comments', title: '社区评论管理', icon: 'ChatDotSquare', permission: 'content:news:list' },
       { path: '/content/community-tags', title: '社区标签管理', icon: 'CollectionTag', permission: 'content:news:list' },
       { path: '/content/media', title: '媒体素材', icon: 'FolderOpened', permission: 'content:media:manage' }
     ]
