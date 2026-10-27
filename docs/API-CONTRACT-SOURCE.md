@@ -1,9 +1,15 @@
 # API 契约来源说明
 
+2026-10-27 反馈审批：状态仅0待审批/2已完成；列表按实际官方回复是否为空筛选和映射，兼容历史处理中/关闭记录。PUT /admin/v1/feedbacks/{id}/reply 提交非空officialReply并固定携带replyStatus=2，兼容旧后端必填校验；服务端成功回复自动写2，页面不再手选状态。待办与列表使用同一规则，无数据库迁移。详见后端权威契约“用户反馈闭环”。
+
 权威仓库：https://github.com/xiaoyejinjier/GlucoPilot-backend
 权威文件：docs/API-CONTRACT.md
 调用方发布前应在验收记录中登记对应后端提交 SHA 和镜像标签。
 用户端 /api/v1/**，管理端 /admin/v1/**；响应 { code, message, data, requestId }，成功码 0。
+
+2026-10-27食品换图：管理员已保存的/api/v1/foods/images/{mediaId}登记配图优先于识别来源实拍，列表及编辑重开保持同一选择，用户端foods.imageUrl同样优先返回登记配图。默认卡通兜底不覆盖实拍；reviewImage/source_media_id保留，原图文件不改动，复用原接口及字段，无迁移。
+
+2026-10-26：GET /admin/v1/work-reminders增加FOOD_REVIEW“待审核食品”，需要food:library:manage，只统计未删除、AI_ESTIMATE且下架食品；GET /admin/v1/foods增加pendingReview=true数据库分页筛选，与汇总条件一致。点击进入/nutrition/foods?review=pending&reminder=刷新标识，清空旧条件；保存/启用/删除成功即刷新信封，审核后移出待办。无数据库迁移。
 
 2026-10-21：社区联调对齐——`GET /api/v1/news/{id}` 详情增加 `tags`；管理端文章/举报接口已落地（非 UI 占位），联调以 backend `docs/API-CONTRACT.md` 与对应提交 SHA 为准。举报列表字段为 JDBC snake_case（`target_type`/`created_at` 等）。
 

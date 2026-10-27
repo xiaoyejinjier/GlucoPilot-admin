@@ -7,12 +7,12 @@
     </template>
     <div class="mail-panel">
       <div class="mail-heading"><strong>待办消息</strong><el-button link type="primary" :loading="loading" @click="refresh">刷新</el-button></div>
-      <p class="mail-hint">新的举报和反馈会在这里提醒</p>
+      <p class="mail-hint">举报、反馈和待审核食品会在这里提醒</p>
       <div v-if="error" class="mail-error" role="status"><span>{{ error }}</span><el-button link type="primary" @click="refresh">重试</el-button></div>
       <div v-if="!ready && loading" class="mail-empty">正在加载消息…</div>
       <template v-else-if="summary.items.length">
         <button v-for="item in summary.items" :key="item.type" class="mail-item" type="button" @click="open(item)">
-          <span class="mail-kind" :class="item.type === 'REPORT' ? 'report-kind' : 'feedback-kind'"><el-icon><Warning v-if="item.type === 'REPORT'" /><ChatLineSquare v-else /></el-icon></span>
+          <span class="mail-kind" :class="item.type === 'REPORT' ? 'report-kind' : 'feedback-kind'"><el-icon><Warning v-if="item.type === 'REPORT'" /><Apple v-else-if="item.type === 'FOOD_REVIEW'" /><ChatLineSquare v-else /></el-icon></span>
           <span class="mail-copy"><span class="mail-title">{{ item.title }}<span class="mail-count">{{ item.count > 99 ? '99+' : item.count }}</span></span><span class="mail-subtitle">{{ item.count }} 条待处理<span v-if="item.latestAt"> · {{ time(item.latestAt) }}</span></span></span>
           <el-icon class="mail-arrow"><ArrowRight /></el-icon>
         </button>
@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Message, Warning, ChatLineSquare, ArrowRight, CircleCheck } from '@element-plus/icons-vue'
+import { Message, Warning, ChatLineSquare, Apple, ArrowRight, CircleCheck } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { getAccessToken } from '@/utils/request'
 import { createResourcePoller } from '@/utils/resource-monitor'
@@ -34,7 +34,7 @@ import { WORK_REMINDERS_CHANGED, workReminderTarget } from '@/utils/work-reminde
 import { workRemindersApi, type WorkReminder, type WorkReminderSummary } from '@/api/work-reminders'
 
 const auth = useAuthStore(), router = useRouter()
-const available = computed(() => auth.isLoggedIn && (auth.hasPermission('content:news:list') || auth.hasPermission('feedback:manage')))
+const available = computed(() => auth.isLoggedIn && (auth.hasPermission('content:news:list') || auth.hasPermission('feedback:manage') || auth.hasPermission('food:library:manage')))
 const summary = ref<WorkReminderSummary>({ total: 0, items: [] }), visible = ref(false), loading = ref(false), ready = ref(false), error = ref('')
 const hasMessages = computed(() => summary.value.total > 0)
 let poller: ReturnType<typeof createResourcePoller> | undefined

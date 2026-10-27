@@ -11,14 +11,13 @@
           <el-option v-for="t in types" :key="t" :label="t" :value="t" />
         </el-select>
         <el-select v-model="q.status" placeholder="处理状态" clearable style="width: 150px" @change="search">
-          <el-option label="待处理" value="received" />
-          <el-option label="处理中" value="processing" />
+          <el-option label="待审批" value="received" />
           <el-option label="已完成" value="done" />
         </el-select>
         <el-input v-model="q.keyword" placeholder="关键词" clearable :prefix-icon="Search" style="width: 200px" @keyup.enter="search" @clear="search" />
         <el-button type="primary" @click="search">查询</el-button>
         <el-button @click="reset">重置</el-button>
-        <span class="text-muted" style="font-size: 12px">状态流转：待处理 → 处理中 → 已完成</span>
+        <span class="text-muted" style="font-size: 12px">提交回复后自动标为已完成</span>
       </div>
 
       <el-table :data="list" v-loading="loading" row-key="id" height="100%" class="paginated-table">
@@ -64,14 +63,10 @@
         </div>
         <el-form label-width="90px">
           <el-form-item label="处理状态">
-            <el-radio-group v-model="form.status">
-              <el-radio value="received">待处理</el-radio>
-              <el-radio value="processing">处理中</el-radio>
-              <el-radio value="done">已完成</el-radio>
-            </el-radio-group>
+            <el-tag :type="statusType(dialog.row.status)">{{ statusText(dialog.row.status) }}</el-tag>
           </el-form-item>
-          <el-form-item label="回复内容">
-            <el-input v-model="form.reply" type="textarea" :rows="4" placeholder="填写给用户的回复（将回写小程序端）" />
+          <el-form-item label="回复内容" required>
+            <el-input v-model="form.reply" type="textarea" :rows="4" maxlength="1000" show-word-limit placeholder="填写给用户的回复，提交后自动完成审批" />
           </el-form-item>
         </el-form>
       </template>
@@ -104,7 +99,7 @@ type FeedbackFilters = { keyword?: string; feedbackType?: number; replyStatus?: 
 const { page, records: list, loading, pageSummary, load, search: applyFilters, changeSize, changePage } =
   useServerPagination<Feedback, FeedbackFilters>(api.pageFeedback, {}, { errorMessage: '反馈加载失败' })
 const dialog = reactive<{ visible: boolean; row: Feedback | null }>({ visible: false, row: null })
-const form = reactive({ status: 'received' as FeedbackStatus, reply: '' })
+const form = reactive({ reply: '' })
 
 watch(() => route.query.reminder, value => {
   if (value) {
@@ -117,7 +112,7 @@ function search() {
   return applyFilters({
     keyword: q.keyword.trim() || undefined,
     feedbackType: q.type ? types.indexOf(q.type) + 1 : undefined,
-    replyStatus: q.status ? ({ received: 0, processing: 1, done: 2 } as const)[q.status] : undefined
+    replyStatus: q.status ? ({ received: 0, done: 2 } as const)[q.status] : undefined
   })
 }
 
@@ -129,30 +124,29 @@ function reset() {
 }
 
 function statusType(s: FeedbackStatus): 'danger' | 'warning' | 'success' {
-  return s === 'received' ? 'danger' : s === 'processing' ? 'warning' : 'success'
+  return s === 'done' ? 'success' : 'warning'
 }
 function statusText(s: FeedbackStatus): string {
-  return s === 'received' ? '待处理' : s === 'processing' ? '处理中' : '已完成'
+  return s === 'done' ? '已完成' : '待审批'
 }
 
 function openHandle(row: Feedback) {
   dialog.row = row
-  form.status = row.status
   form.reply = row.reply
   dialog.visible = true
 }
 
 async function saveReply() {
-  if (!dialog.row) return
-  if (form.status === 'done' && !form.reply.trim()) {
-    ElMessage.warning('标记已完成时必须填写给用户的回复')
+  if (!dialog.row || saving.value) return
+  if (!form.reply.trim()) {
+    ElMessage.warning('请填写回复内容，提交后自动完成审批')
     return
   }
   saving.value = true
   try {
-    await api.replyFeedback(dialog.row.id, form.reply, form.status)
+    await api.replyFeedback(dialog.row.id, form.reply)
     refreshWorkReminders()
-    if (auth.account) api.writeLog(auth.account.username, auth.account.role, '反馈', '处理反馈', `#${dialog.row.id} → ${statusText(form.status)}`)
+    if (auth.account) api.writeLog(auth.account.username, auth.account.role, '反馈', '处理反馈', `#${dialog.row.id} → 已完成`)
     dialog.visible = false
     ElMessage.success('审批结果已回写，用户端可在“我的反馈”查看')
     await load()

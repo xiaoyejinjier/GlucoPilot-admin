@@ -1,5 +1,14 @@
 <template>
-  <img :src="source" :alt="`${food.name || '食物'}图片`" @error="onImageError" />
+  <el-image
+    :key="source"
+    :src="source"
+    :alt="`${food.name || '食物'}图片`"
+    :fit="preview ? 'contain' : 'cover'"
+    :preview-src-list="preview ? [source] : []"
+    preview-teleported
+    hide-on-click-modal
+    @error="onImageError"
+  />
 </template>
 
 <script setup lang="ts">
@@ -7,12 +16,13 @@ import { computed, ref, watch } from 'vue'
 import { foodImageApi } from '@/api/food-images'
 import { getAccessToken } from '@/utils/request'
 import type { FoodItem } from '@/types'
-import { getBundledFoodImage, resolveFoodImage } from './foodImages'
+import { getBundledFoodImage, isUploadedFoodImage, resolveFoodImage } from './foodImages'
 
 const props = withDefaults(defineProps<{
   food: Pick<FoodItem, 'name' | 'categoryName' | 'image' | 'reviewImage'>
   preferReview?: boolean
-}>(), { preferReview: true })
+  preview?: boolean
+}>(), { preferReview: true, preview: false })
 
 const photo = ref('')
 const publicFailed = ref(false)
@@ -20,7 +30,7 @@ const source = computed(() => photo.value || (publicFailed.value
   ? getBundledFoodImage(props.food.name, props.food.categoryName)
   : resolveFoodImage(props.food)))
 
-watch(() => props.preferReview ? props.food.reviewImage : '', async (path, _previous, onCleanup) => {
+watch(() => props.preferReview && !isUploadedFoodImage(props.food.image) ? props.food.reviewImage : '', async (path, _previous, onCleanup) => {
   photo.value = ''
   publicFailed.value = false
   let active = true
@@ -38,7 +48,7 @@ watch(() => props.preferReview ? props.food.reviewImage : '', async (path, _prev
     objectUrl = URL.createObjectURL(blob)
     photo.value = objectUrl
   } catch {
-    // 删除、禁用、审核完成或读取失败时沿用现有配图，不影响审核表单。
+    // 原食品/照片已删除或读取失败时沿用现有配图；审核和上下架不更换照片。
   }
 }, { immediate: true })
 

@@ -8,10 +8,14 @@ const { parse } = require('../../node_modules/@vue/compiler-sfc')
 const root = path.resolve(__dirname, '../..')
 const flush = () => new Promise(resolve => setImmediate(resolve))
 
-function photo() {
-  const props = { food: { name: '新食品', image: '/public-food.jpg', categoryName: '主食类', reviewImage: '/admin/v1/foods/7/review-image' }, preferReview: true }
+function photo(food = {}) {
+  const props = { food: { name: '新食品', image: '/public-food.jpg', categoryName: '主食类', reviewImage: '/admin/v1/foods/7/review-image', ...food }, preferReview: true }
   const calls = [], revoked = [], watchers = []
   let token = 'admin', urls = 0
+  const imageHelpers={exports:{}}
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,'src/views/nutrition/foodImages.ts'),'utf8'),{
+    compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}
+  }).outputText,{module:imageHelpers,exports:imageHelpers.exports})
   const dependencies = {
     vue: { ref: value => ({ value }), computed: fn => ({ get value() { return fn() } }),
       watch(getter, callback, options = {}) {
@@ -21,7 +25,7 @@ function photo() {
       } },
     '@/api/food-images': { foodImageApi: { review(path) { return new Promise((resolve, reject) => calls.push({ path, resolve, reject })) } } },
     '@/utils/request': { getAccessToken: () => token },
-    './foodImages': { resolveFoodImage: food => food.image || '/bundled.svg', getBundledFoodImage: () => '/bundled.svg' }
+    './foodImages': { ...imageHelpers.exports, resolveFoodImage: food => food.image || '/bundled.svg', getBundledFoodImage: () => '/bundled.svg' }
   }
   const script = parse(fs.readFileSync(path.join(root, 'src/views/nutrition/FoodPhoto.vue'), 'utf8')).descriptor.scriptSetup.content
   const module = { exports: {} }
@@ -41,7 +45,7 @@ function photo() {
   }
 }
 
-test('待审核优先用户实拍，缺失或失败逐级回落且不改公开配图', async () => {
+test('食品优先用户实拍，缺失或失败逐级回落且不改公开配图', async () => {
   const page = photo()
   assert.equal(page.source.value, '/public-food.jpg')
   page.calls[0].resolve(new Blob(['photo'], { type: 'image/jpeg' })); await flush()
@@ -52,6 +56,20 @@ test('待审核优先用户实拍，缺失或失败逐级回落且不改公开�
   page.unmount(); assert.deepEqual(page.revoked, ['blob:photo-1'])
   const failure = photo(); failure.calls[0].reject(new Error('deleted')); await flush()
   assert.equal(failure.source.value, '/public-food.jpg')
+})
+
+test('启用、停用及保存营养值不替换已显示的用户实拍图', async () => {
+  const page = photo()
+  page.calls[0].resolve(new Blob(['same-real-photo'], { type: 'image/jpeg' })); await flush()
+  const original = page.source.value
+  for (const state of [{ enabled: true, nutritionSource: 'AI_REVIEWED' },
+    { enabled: false, nutritionSource: 'AI_REVIEWED' }, { enabled: true, carbs: 18 }]) {
+    page.update({ food: { ...page.props.food, ...state } })
+    assert.equal(page.source.value, original)
+  }
+  assert.equal(page.calls.length, 1)
+  page.unmount()
+  assert.deepEqual(page.revoked, [original])
 })
 
 test('换食品丢弃迟到结果，离页回收实拍临时地址', async () => {
@@ -72,6 +90,24 @@ test('运营改选图片后展示所选配图，账号变更不展示旧请求�
   const changed = photo(); changed.setToken('another-admin')
   changed.calls[0].resolve(new Blob(['private'])); await flush()
   assert.equal(changed.source.value, '/public-food.jpg')
+})
+
+test('上传图保存后重新打开和重新加载列表仍展示管理员配图，不被旧实拍覆盖', async () => {
+  const saved='/api/v1/foods/images/72'
+  const reopened=photo({image:saved})
+  await flush()
+  assert.equal(reopened.source.value,saved)
+  assert.equal(reopened.calls.length,0)
+  reopened.update({food:{...reopened.props.food,enabled:true,nutritionSource:'AI_REVIEWED'}})
+  assert.equal(reopened.source.value,saved)
+  assert.equal(reopened.calls.length,0)
+  reopened.unmount()
+  const pending=photo()
+  pending.update({food:{...pending.props.food,image:saved}})
+  pending.calls[0].resolve(new Blob(['old-source']));await flush()
+  assert.equal(pending.source.value,saved)
+  assert.equal(pending.calls.length,1)
+  pending.unmount()
 })
 
 function requester(response) {

@@ -7,7 +7,8 @@ function feed(){
   const doc={visibilityState:'visible',addEventListener:(name,fn)=>state.listeners.set(name,fn),removeEventListener:name=>state.listeners.delete(name)}
   const win={addEventListener:doc.addEventListener,removeEventListener:doc.removeEventListener}
   const polling={exports:{}};vm.runInNewContext(transpile(fs.readFileSync(path.join(root,'src/utils/resource-monitor.ts'),'utf8')),{module:polling,exports:polling.exports,setTimeout:(fn,delay)=>{const id=++state.next;state.timers.set(id,{fn,delay});return id},clearTimeout:id=>state.timers.delete(id)})
-  const deps={vue:{ref:value=>({value}),computed:fn=>({get value(){return fn()}}),watch:(getter,fn,options)=>{state.watchers.push(fn);if(options?.immediate)fn()},onMounted:fn=>fn(),onBeforeUnmount:fn=>state.unmount.push(fn)},'vue-router':{useRouter:()=>({push:target=>state.routes.push(target)})},'@element-plus/icons-vue':{},'@/stores/auth':{useAuthStore:()=>auth},'@/utils/request':{getAccessToken:()=>state.token},'@/utils/resource-monitor':polling.exports,'@/utils/work-reminders':{WORK_REMINDERS_CHANGED:'changed',workReminderTarget:type=>({path:type==='REPORT'?'/content/community-reports':'/feedback',query:{reminder:'next'}})},'@/api/work-reminders':{workRemindersApi:{summary:()=>new Promise((resolve,reject)=>state.calls.push({resolve,reject}))}}}
+  const targets={exports:{}};vm.runInNewContext(transpile(fs.readFileSync(path.join(root,'src/utils/work-reminders.ts'),'utf8')),{module:targets,exports:targets.exports})
+  const deps={vue:{ref:value=>({value}),computed:fn=>({get value(){return fn()}}),watch:(getter,fn,options)=>{state.watchers.push(fn);if(options?.immediate)fn()},onMounted:fn=>fn(),onBeforeUnmount:fn=>state.unmount.push(fn)},'vue-router':{useRouter:()=>({push:target=>state.routes.push(target)})},'@element-plus/icons-vue':{},'@/stores/auth':{useAuthStore:()=>auth},'@/utils/request':{getAccessToken:()=>state.token},'@/utils/resource-monitor':polling.exports,'@/utils/work-reminders':{...targets.exports,WORK_REMINDERS_CHANGED:'changed'},'@/api/work-reminders':{workRemindersApi:{summary:()=>new Promise((resolve,reject)=>state.calls.push({resolve,reject}))}}}
   const source=parse(fs.readFileSync(path.join(root,'src/components/WorkReminders.vue'),'utf8')).descriptor.scriptSetup.content
   const module={exports:{}};vm.runInNewContext(transpile(source+'\nmodule.exports={summary,hasMessages,available,visible,loading,error,ready,open,refresh};'),{module,exports:module.exports,document:doc,window:win,require:name=>{assert.ok(deps[name],name);return deps[name]}})
   return {...module.exports,state,auth,doc,dispose(){state.unmount.forEach(fn=>fn())}}
@@ -54,4 +55,15 @@ test('反馈提醒重置旧筛选和页码，处理成功刷新顶部消息',asy
   const module={exports:{}};vm.runInNewContext(transpile(script+'\nmodule.exports={q,dialog,form,saveReply};'),{module,exports:module.exports,require:name=>{assert.ok(deps[name],name);return deps[name]}})
   assert.equal(calls[0].replyStatus,0);const p=module.exports;p.q.keyword='旧词';p.q.type='产品建议';p.q.status='done';watchers[0]('2');assert.equal(p.q.keyword,'');assert.equal(p.q.status,'received');assert.equal(calls[1].feedbackType,undefined);assert.equal(calls[1].replyStatus,0)
   p.dialog.row={id:1};p.form.status='done';p.form.reply='感谢反馈';await p.saveReply();assert.deepEqual(calls.slice(-3),['reply','refresh','load'])
+})
+
+test('只有食品管理权限也显示信封，待审核食品亮红点并跳转实际待审核列表',async()=>{
+  const p=feed();p.auth.account={id:3,permissions:['food:library:manage']};p.state.token='food';p.state.watchers[0]()
+  assert.equal(p.available.value,true);assert.equal(p.state.calls.length,2)
+  p.state.calls[0].resolve(data);await tick();assert.equal(p.summary.value.total,0)
+  const item={type:'FOOD_REVIEW',title:'待审核食品',count:2,latestAt:'2026-10-26T12:30:00'}
+  p.state.calls[1].resolve({total:2,items:[item]});await tick();assert.equal(p.hasMessages.value,true)
+  p.open(item);assert.equal(p.state.routes[0].path,'/nutrition/foods');assert.equal(p.state.routes[0].query.review,'pending')
+  p.state.listeners.get('changed')();p.state.calls[2].resolve({total:0,items:[]});await tick();assert.equal(p.hasMessages.value,false)
+  p.dispose()
 })
