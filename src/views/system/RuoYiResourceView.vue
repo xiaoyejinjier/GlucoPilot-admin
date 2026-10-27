@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
@@ -151,11 +151,20 @@ function defaults() {
   return result
 }
 
+let loadVersion = 0
 async function load() {
+  const version = ++loadVersion
+  const resource = config.value.resource
   loading.value = true
-  try { rows.value = await ruoyiApi.list<RuoYiRow>(config.value.resource) }
-  catch (error) { ElMessage.error((error as Error).message || '加载失败') }
-  finally { loading.value = false }
+  try {
+    const result = await ruoyiApi.list<RuoYiRow>(resource)
+    // Rapid menu changes can leave a previous resource request in flight.
+    if (version === loadVersion) rows.value = result
+  } catch (error) {
+    if (version === loadVersion) ElMessage.error((error as Error).message || '加载失败')
+  } finally {
+    if (version === loadVersion) loading.value = false
+  }
 }
 
 function openCreate() {
@@ -222,7 +231,12 @@ function display(value: unknown, field: string) {
   }
   return value == null || value === '' ? '—' : String(value)
 }
-onMounted(load)
+// These routes reuse this component, so mounting alone misses menu changes.
+watch(() => config.value.resource, () => {
+  dialog.visible = false
+  rows.value = []
+  void load()
+}, { immediate: true })
 </script>
 
 <style scoped>
