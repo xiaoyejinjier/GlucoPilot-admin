@@ -28,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
@@ -51,14 +51,24 @@ const rows = ref<RuoYiRow[]>([])
 const info = ref<Record<string, unknown>>({})
 const details = computed(() => Object.entries(info.value).map(([key, value]) => ({ key, label: labels[key] || key, value: display(value) })))
 
+let loadVersion = 0
 async function load() {
+  const version = ++loadVersion
+  const { kind, resource } = config.value
   loading.value = true
   try {
-    if (config.value.kind === 'server' || config.value.kind === 'cache') {
-      info.value = await ruoyiApi.getOne<Record<string, unknown>>(config.value.resource)
-    } else rows.value = await ruoyiApi.list<RuoYiRow>(config.value.resource)
-  } catch (error) { ElMessage.error((error as Error).message || '加载失败') }
-  finally { loading.value = false }
+    if (kind === 'server' || kind === 'cache') {
+      const result = await ruoyiApi.getOne<Record<string, unknown>>(resource)
+      if (version === loadVersion) info.value = result
+    } else {
+      const result = await ruoyiApi.list<RuoYiRow>(resource)
+      if (version === loadVersion) rows.value = result
+    }
+  } catch (error) {
+    if (version === loadVersion) ElMessage.error((error as Error).message || '加载失败')
+  } finally {
+    if (version === loadVersion) loading.value = false
+  }
 }
 async function forceLogout(id: string | number) {
   try { await ruoyiApi.remove('online', id); ElMessage.success('会话已强退'); await load() }
@@ -71,7 +81,12 @@ function display(value: unknown) {
   if (value === 0 || value === '0') return '失败/停用'
   return value == null || value === '' ? '—' : String(value)
 }
-onMounted(load)
+// Monitoring routes share this component; each resource needs its own data.
+watch(() => config.value.resource, () => {
+  rows.value = []
+  info.value = {}
+  void load()
+}, { immediate: true })
 </script>
 
 <style scoped>
