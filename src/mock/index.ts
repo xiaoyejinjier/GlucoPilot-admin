@@ -132,7 +132,7 @@ function seed(): DBShape {
 
   const feedback: Feedback[] = [
     { id: 1, userId: 3, userName: '陈师傅', type: '产品建议', content: '希望拍照估糖能区分“饭量大小”，我吃半碗和一碗估算应该不一样。', contact: '', status: 'received', reply: '', createdAt: '2026-09-19 09:12', processedAt: '' },
-    { id: 2, userId: 6, userName: '刘姐', type: 'Bug问题', content: '九节点页面早餐后的图标点击没有反应，麻烦看下。', contact: '13800000006', status: 'processing', reply: '已复现，正在修复该节点跳转问题。', createdAt: '2026-09-18 20:03', processedAt: '2026-09-19 10:00' },
+    { id: 2, userId: 6, userName: '刘姐', type: 'Bug问题', content: '九节点页面早餐后的图标点击没有反应，麻烦看下。', contact: '13800000006', status: 'done', reply: '已复现，正在修复该节点跳转问题。', createdAt: '2026-09-18 20:03', processedAt: '2026-09-19 10:00' },
     { id: 3, userId: 12, userName: '糖友1011', type: '功能诉求', content: '希望增加更丰富的控糖科普内容。', contact: '', status: 'done', reply: '已收录需求，感谢建议！', createdAt: '2026-09-15 11:40', processedAt: '2026-09-16 09:30' },
     { id: 4, userId: 8, userName: '孙女士', type: '其他', content: '导出数据的 Excel 里日期列格式有点乱。', contact: '13800000008', status: 'received', reply: '', createdAt: '2026-09-20 08:22', processedAt: '' }
   ]
@@ -518,7 +518,7 @@ export const api = {
   async pageFeedback(query: { pageNum: number; pageSize: number; keyword?: string; feedbackType?: number; replyStatus?: number }) {
     await delay()
     const typeNames: Feedback['type'][] = ['产品建议', 'Bug问题', '功能诉求', '其他']
-    const statusCodes: Record<Feedback['status'], number> = { received: 0, processing: 1, done: 2 }
+    const statusCodes: Record<Feedback['status'], number> = { received: 0, done: 2 }
     const rows = [...db.feedback]
       .filter((item) => !query.keyword || item.content.includes(query.keyword) || item.userName.includes(query.keyword))
       .filter((item) => query.feedbackType === undefined || item.type === typeNames[query.feedbackType - 1])
@@ -526,13 +526,13 @@ export const api = {
       .sort((a, b) => a.id - b.id)
     return pageOf(rows, query.pageNum, query.pageSize)
   },
-  async replyFeedback(id: number, reply: string, status: Feedback['status']) {
+  async replyFeedback(id: number, reply: string) {
     await delay()
     const f = db.feedback.find((x) => x.id === id)
     if (f) {
       f.reply = reply
-      f.status = status
-      f.processedAt = status === 'done' ? new Date().toLocaleString('zh-CN', { hour12: false }) : f.processedAt
+      f.status = 'done'
+      f.processedAt = new Date().toLocaleString('zh-CN', { hour12: false })
       persist()
     }
   },

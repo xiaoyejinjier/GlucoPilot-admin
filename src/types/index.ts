@@ -182,7 +182,7 @@ export interface FoodItem {
   updatedAt: string
   nutritionSource?: 'MANUAL' | 'AI_ESTIMATE' | 'AI_REVIEWED'
   sourceModel?: string | null
-  reviewImage?: string | null // 只读：待审核实拍预览，需运营鉴权
+  reviewImage?: string | null // 只读：识别来源实拍预览，审核/上下架后保留，需运营鉴权
 }
 
 
@@ -200,7 +200,7 @@ export interface DeviceItem {
 
 /* ------- 反馈 ------- */
 export type FeedbackType = '产品建议' | 'Bug问题' | '功能诉求' | '其他'
-export type FeedbackStatus = 'received' | 'processing' | 'done'
+export type FeedbackStatus = 'received' | 'done'
 
 export interface Feedback {
   id: number

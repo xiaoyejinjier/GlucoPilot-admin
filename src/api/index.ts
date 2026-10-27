@@ -71,16 +71,8 @@ const feedbackTypes: Record<number, FeedbackType> = {
   4: '其他'
 }
 
-function feedbackStatus(code: number): FeedbackStatus {
-  if (code === 1) return 'processing'
-  if (code === 2 || code === 3) return 'done'
-  return 'received'
-}
-
-function feedbackStatusCode(status: FeedbackStatus): number {
-  if (status === 'processing') return 1
-  if (status === 'done') return 2
-  return 0
+function feedbackStatus(reply: string | null | undefined): FeedbackStatus {
+  return reply?.trim() ? 'done' : 'received'
 }
 
 function mapFood(f: FoodItem): FoodItem {
@@ -123,7 +115,7 @@ function mapFeedback(row: AdminFeedbackRow): Feedback {
     type: feedbackTypes[row.feedbackType] || '其他',
     content: row.contentText || '',
     contact: row.contact || '',
-    status: feedbackStatus(Number(row.replyStatus)),
+    status: feedbackStatus(row.officialReply),
     reply: row.officialReply || '',
     createdAt: fmtTime(row.createdAt),
     processedAt: row.repliedAt ? fmtTime(row.repliedAt) : ''
@@ -244,7 +236,7 @@ const remote = {
     const data = await get<PageData<FoodItem> | FoodItem[]>('/admin/v1/foods?pageNum=1&pageSize=100')
     return (Array.isArray(data) ? data : (data.records || [])).map(mapFood)
   },
-  async pageFoods(params: { pageNum: number; pageSize: number; keyword?: string; categoryId?: number; enabled?: boolean }) {
+  async pageFoods(params: { pageNum: number; pageSize: number; keyword?: string; categoryId?: number; enabled?: boolean; pendingReview?: boolean }) {
     const page = await get<PageData<FoodItem>>(`/admin/v1/foods?${queryString(params)}`)
     if (!page || Array.isArray(page) || !Array.isArray(page.records) || !Number.isFinite(Number(page.total))) {
       throw new Error('食品接口未返回分页数据，请确认后端已更新并重启')
@@ -420,9 +412,9 @@ const remote = {
     const page = await get<PageData<AdminFeedbackRow>>(`/admin/v1/feedbacks?${queryString(params)}`)
     return { ...page, records: (page.records || []).map(mapFeedback) }
   },
-  async replyFeedback(id: number, reply: string, status: FeedbackStatus) {
+  async replyFeedback(id: number, reply: string) {
     await put(`/admin/v1/feedbacks/${id}/reply`, {
-      replyStatus: feedbackStatusCode(status),
+      replyStatus: 2,
       officialReply: reply.trim()
     })
   },

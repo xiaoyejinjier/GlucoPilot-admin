@@ -65,13 +65,14 @@
               />
               <el-select
                 v-model="enabledFilter"
-                placeholder="上下架状态"
+                placeholder="食品状态"
                 clearable
                 class="status-filter"
                 @change="search"
               >
                 <el-option label="已上架" value="enabled" />
                 <el-option label="已下架" value="disabled" />
+                <el-option label="待审核" value="pending" />
               </el-select>
               <el-button type="primary" @click="search">查询</el-button>
               <el-button text @click="resetFilters">重置</el-button>
@@ -157,17 +158,23 @@
             </el-table-column>
           </el-table>
           <div class="pagination-wrap">
-            <span class="pagination-summary"><span class="adaptive-size">自适应 · 每页 {{ page.pageSize }} 条</span>{{ pageSummary }}</span>
+            <span class="pagination-summary"><span class="adaptive-size">{{ manualPageSize ? '每页 ' + page.pageSize + ' 条' : '自适应 · 每页 ' + page.pageSize + ' 条' }}</span>{{ pageSummary }}</span>
+            <div class="pagination-controls">
             <el-pagination
               :current-page="page.pageNum"
               :page-size="page.pageSize"
+              :page-sizes="pageSizeOptions"
               :total="page.total"
               :disabled="loading"
               background
               :pager-count="5"
-              layout="prev, pager, next, jumper"
+              layout="slot, sizes, prev, pager, next, jumper"
+              @update:page-size="onPageSizeChange"
               @update:current-page="changePage"
-            />
+            >
+              <el-button class="page-size-default" link type="primary" :disabled="savedPageSize === page.pageSize" title="下次进入沿用当前每页条数" @click="saveDefaultPageSize">{{ savedPageSize === page.pageSize ? '已设为默认' : '设为默认' }}</el-button>
+            </el-pagination>
+            </div>
           </div>
         </div>
       </section>
@@ -323,9 +330,12 @@
             <FoodPhoto
               :food="foodDialog.form"
               :prefer-review="!imageManuallySelected"
+              preview
               class="food-preview"
+              title="点击放大查看原图"
             />
             <div class="food-image-controls">
+              <span class="image-tip">点击图片可放大查看，支持缩放和旋转</span>
               <el-select
                 v-model="foodDialog.form.image"
                 filterable
@@ -363,7 +373,7 @@
                 </el-button>
               </el-upload>
               <span class="image-tip"
-                >{{ foodDialog.form.reviewImage && !imageManuallySelected ? '当前优先预览用户实拍；可另选食品库配图' : '可选择已有图片，或上传 JPG/PNG 图片（不超过 5MB）' }}</span
+                >{{ foodDialog.form.reviewImage && !imageManuallySelected && !isUploadedFoodImage(foodDialog.form.image) ? '当前优先预览用户实拍；可另选食品库配图' : '可选择已有图片，或上传 JPG/PNG 图片（不超过 5MB）' }}</span
               >
             </div>
           </div>
@@ -411,24 +421,27 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { ElMessage } from "element-plus";
 import type { TableInstance, UploadFile, UploadInstance } from "element-plus";
 import { Delete, Download, Edit, Plus, Search, Upload } from "@element-plus/icons-vue";
 import { api } from "@/api";
 import { foodImageApi } from "@/api/food-images";
 import { useAuthStore } from "@/stores/auth";
+import { refreshWorkReminders } from "@/utils/work-reminders";
 import FoodPhoto from "./FoodPhoto.vue";
 import type { FoodCategory, FoodItem } from "@/types";
 import {
   DEFAULT_FOOD_IMAGE,
   FOOD_IMAGE_OPTIONS,
   getBundledFoodImage,
+  isUploadedFoodImage,
   resolveCategoryImage,
-  resolveFoodImage,
 } from "./foodImages";
 
 const auth = useAuthStore();
+const route = useRoute();
 const loading = ref(false);
 const imageUploading = ref(false);
 const foodSaving = ref(false);
@@ -443,7 +456,10 @@ const foods = ref<FoodItem[]>([]);
 const keyword = ref("");
 const filterCategory = ref(0);
 const enabledFilter = ref("");
-const page = reactive({ pageNum: 1, pageSize: 12, total: 0 });
+const savedPageSize = ref<number | null>(readDefaultPageSize());
+const manualPageSize = ref(savedPageSize.value !== null);
+const page = reactive({ pageNum: 1, pageSize: savedPageSize.value ?? 12, total: 0 });
+const pageSizeOptions = computed(() => [...new Set([10, 20, 50, 100, page.pageSize])].sort((a, b) => a - b));
 const foodTable = ref<TableInstance>();
 let tableResizeObserver: ResizeObserver | undefined;
 let resizeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -463,7 +479,7 @@ function measurePageSize() {
 }
 
 function resizePageToFit() {
-  if (pageDisposed) return;
+  if (pageDisposed || manualPageSize.value) return;
   const size = measurePageSize();
   if (size !== undefined) return changeSize(size);
 }
@@ -482,6 +498,7 @@ const appliedFilters = reactive<{
   keyword?: string;
   categoryId?: number;
   enabled?: boolean;
+  pendingReview?: boolean;
 }>({});
 let latestFoodRequest = 0;
 let latestCategoryRequest = 0;
@@ -629,10 +646,11 @@ async function load() {
   }
 }
 onMounted(async () => {
+  if (route.query.review === "pending") setPendingReviewFilters();
   loadCategories();
   await nextTick();
   if (pageDisposed) return;
-  page.pageSize = measurePageSize() ?? page.pageSize;
+  if (!manualPageSize.value) page.pageSize = measurePageSize() ?? page.pageSize;
   const table = foodTable.value?.$el as HTMLElement | undefined;
   if (table && typeof ResizeObserver !== "undefined") {
     tableResizeObserver = new ResizeObserver(schedulePageResize);
@@ -657,11 +675,27 @@ function search() {
   Object.assign(appliedFilters, {
     keyword: keyword.value.trim() || undefined,
     categoryId: filterCategory.value || undefined,
-    enabled: enabledFilter.value ? enabledFilter.value === "enabled" : undefined,
+    enabled: ["enabled", "disabled"].includes(enabledFilter.value) ? enabledFilter.value === "enabled" : undefined,
+    pendingReview: enabledFilter.value === "pending" ? true : undefined,
   });
   page.pageNum = 1;
   return load();
 }
+
+function setPendingReviewFilters() {
+  keyword.value = "";
+  filterCategory.value = 0;
+  enabledFilter.value = "pending";
+  page.pageNum = 1;
+  Object.assign(appliedFilters, { keyword: undefined, categoryId: undefined, enabled: undefined, pendingReview: true });
+}
+
+watch(() => [route.query.review, route.query.reminder], () => {
+  if (route.query.review === "pending") {
+    setPendingReviewFilters();
+    void load();
+  }
+});
 
 function resetFilters() {
   keyword.value = "";
@@ -676,11 +710,53 @@ function selectCategory(categoryId: number) {
 }
 
 function changeSize(size: number) {
+  if (!Number.isInteger(size) || size < 1 || size > 100) return;
   if (page.pageSize === size) return;
   page.pageSize = size;
   page.pageNum = 1;
   return load();
 }
+
+function pageSizePreferenceKey() {
+  return auth.account?.id ? `kt_food_page_size_v1:${auth.account.id}` : '';
+}
+
+function readDefaultPageSize(): number | null {
+  try {
+    const key = pageSizePreferenceKey();
+    if (!key) return null;
+    const value = window.localStorage.getItem(key);
+    if (!value || !/^[1-9]\d*$/.test(value)) return null;
+    const size = Number(value);
+    return Number.isInteger(size) && size <= 100 ? size : null;
+  } catch { return null; }
+}
+
+function onPageSizeChange(size: number) {
+  if (!Number.isInteger(size) || size < 1 || size > 100) return;
+  manualPageSize.value = true;
+  return changeSize(size);
+}
+
+function saveDefaultPageSize() {
+  const key = pageSizePreferenceKey();
+  if (!key) { ElMessage.warning('请登录后设置默认条数'); return; }
+  try {
+    window.localStorage.setItem(key, String(page.pageSize));
+    savedPageSize.value = page.pageSize;
+    manualPageSize.value = true;
+    ElMessage.success(`已设为默认，每页 ${page.pageSize} 条`);
+  } catch { ElMessage.warning('默认条数保存失败，请重试'); }
+}
+
+watch(() => auth.account?.id, () => {
+  savedPageSize.value = readDefaultPageSize();
+  manualPageSize.value = savedPageSize.value !== null;
+  page.pageSize = savedPageSize.value ?? measurePageSize() ?? 12;
+  page.pageNum = 1;
+  if (!auth.account) { ++latestFoodRequest; foods.value = []; page.total = 0; loading.value = false; return; }
+  void load();
+});
 
 function changePage(pageNum: number) {
   if (page.pageNum === pageNum) return;
@@ -740,7 +816,7 @@ async function removeCategory(c: FoodCategory) {
 function openFood(f?: FoodItem) {
   imageManuallySelected.value = false;
   if (f) {
-    foodDialog.form = { ...f, image: resolveFoodImage(f), reviewImage: f.reviewImage || "", nutritionSource: f.nutritionSource || "MANUAL" };
+    foodDialog.form = { ...f, image: f.image || "", reviewImage: f.reviewImage || "", nutritionSource: f.nutritionSource || "MANUAL" };
   } else {
     const category =
       categories.value.find((item) => item.id === filterCategory.value) ||
@@ -770,7 +846,7 @@ async function saveFood() {
   foodDialog.form.categoryId = Number(foodDialog.form.categoryId);
   foodDialog.form.categoryName =
     categories.value.find((c) => c.id === foodDialog.form.categoryId)?.name || "";
-  if (!foodDialog.form.image) {
+  if (!foodDialog.form.id && !foodDialog.form.image) {
     foodDialog.form.image = getBundledFoodImage(
       foodDialog.form.name,
       foodDialog.form.categoryName
@@ -779,6 +855,7 @@ async function saveFood() {
   foodSaving.value = true;
   try {
     const saved = await api.saveFood({ ...foodDialog.form } as FoodItem);
+    refreshWorkReminders();
     if (auth.account)
       api.writeLog(
         auth.account.username,
@@ -800,6 +877,7 @@ async function saveFood() {
 async function removeFood(f: FoodItem) {
   try {
     await api.removeFood(f.id);
+    refreshWorkReminders();
     ElMessage.success("已删除");
     await load();
   } catch (error) {
@@ -824,6 +902,7 @@ function useCategoryFallback(event: Event, category: FoodCategory) {
 async function toggle(f: FoodItem, enabled: boolean) {
   try {
     const saved = await api.saveFood({ ...f, enabled });
+    refreshWorkReminders();
     f.enabled = saved.enabled;
     ElMessage.success("已更新");
     await load();
@@ -1232,6 +1311,7 @@ async function doImport() {
   flex-wrap: wrap;
   gap: 8px;
 }
+.pagination-controls { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 12px; max-width: 100%; }
 .pagination-wrap :deep(.el-pager li) { border-radius: 7px; font-weight: 400; }
 .pagination-wrap :deep(.el-pager li.is-active) { color: var(--kt-brand-dark); background: var(--kt-brand-soft); font-weight: 600; }
 @media (max-width: 1380px) {

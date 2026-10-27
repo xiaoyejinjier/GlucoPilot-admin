@@ -61,6 +61,11 @@ const legacyImageMap: Record<string, string> = {
 
 export const DEFAULT_FOOD_IMAGE = `${FOOD_IMAGE_ROOT}/rice.svg`
 
+/** 管理员已选用的上传配图应覆盖识别来源，不把旧卡通兜底视为换图。 */
+export function isUploadedFoodImage(image?: string): boolean {
+  return /^\/api\/v1\/foods\/images\/[1-9]\d*$/.test((image || '').trim())
+}
+
 /** 根据食物名优先、分类其次，返回仓库中的内置图片。 */
 export function getBundledFoodImage(name?: string, categoryName?: string): string {
   return imageByFoodName.get((name || '').trim()) || imageByCategory[categoryName || ''] || DEFAULT_FOOD_IMAGE

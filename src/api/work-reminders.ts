@@ -1,6 +1,6 @@
 import { get } from '@/utils/request'
 
-export type WorkReminderType = 'REPORT' | 'FEEDBACK'
+export type WorkReminderType = 'REPORT' | 'FEEDBACK' | 'FOOD_REVIEW'
 export interface WorkReminder { type: WorkReminderType; title: string; count: number; latestAt: string | null }
 export interface WorkReminderSummary { total: number; items: WorkReminder[] }
 export const workRemindersApi = {
