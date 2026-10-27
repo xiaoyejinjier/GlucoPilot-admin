@@ -3,7 +3,7 @@
     <div class="head">
       <div>
         <h2 class="page-title">社区评论管理</h2>
-        <p class="text-muted description">评论是先发后审：AI 判违规会立即隐藏并移出公开列表，误判可在这里恢复。</p>
+        <p class="text-muted description">评论是先发后审：AI 判违规会立即隐藏并移出公开列表。运营也可以主动隐藏机器放行的内容，两种情况都能在这里恢复。</p>
       </div>
       <div class="heading-actions">
         <el-button :icon="Refresh" :loading="loading" @click="load">刷新列表</el-button>
@@ -62,15 +62,18 @@
           </template>
         </el-table-column>
         <el-table-column label="可见状态" width="120">
-          <template #default="{row}"><el-tag :type="row.hidden ? 'danger' : 'success'" effect="plain">{{ row.hidden ? '已被隐藏' : '正常可见' }}</el-tag></template>
+          <template #default="{row}">
+            <el-tag :type="row.hidden ? 'danger' : 'success'" effect="plain">{{ row.hidden ? '已被隐藏' : '正常可见' }}</el-tag>
+            <div v-if="row.hidden && row.aiVerdict !== 'REJECT'" class="table-summary">人工隐藏</div>
+          </template>
         </el-table-column>
         <el-table-column label="评论时间" width="160">
           <template #default="{row}">{{ date(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" width="150" fixed="right">
           <template #default="{row}">
-            <el-button v-if="row.hidden" link type="primary" :disabled="saving || !canManage" @click="restore(row)">恢复显示</el-button>
-            <span v-else class="table-summary">无</span>
+            <el-button v-if="row.hidden" link type="primary" :disabled="saving || !canManage" @click="setHidden(row, false)">恢复显示</el-button>
+            <el-button v-else link type="danger" :disabled="saving || !canManage" @click="setHidden(row, true)">隐藏</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -142,23 +145,26 @@ function search() { Object.assign(applied, query, { keyword: query.keyword.trim(
 function resetFilters() { Object.assign(query, { status: '', verdict: '', hidden: '', keyword: '' }); search() }
 function openArticle(row: AdminComment) { void router.push(`/content/news/${row.newsId}/edit`) }
 
-async function restore(row: AdminComment) {
+async function setHidden(row: AdminComment, hidden: boolean) {
   if (saving.value || !canManage.value) return
   const token = getAccessToken()
   try {
     await ElMessageBox.confirm(
-      `恢复后这条评论会重新出现在公开列表里，但不会改写 AI 的原始判定（仍保留为「${verdictText(row.aiVerdict)}」，便于追溯）。确定恢复吗？`,
-      '恢复被隐藏的评论', { type: 'warning', confirmButtonText: '恢复显示', cancelButtonText: '取消' })
+      hidden
+        ? `隐藏后这条评论会立即从公开列表消失，但不会改写 AI 的原始判定（仍保留为「${verdictText(row.aiVerdict)}」），管理员可随时恢复。确定隐藏吗？`
+        : `恢复后这条评论会重新出现在公开列表里，但不会改写 AI 的原始判定（仍保留为「${verdictText(row.aiVerdict)}」，便于追溯）。确定恢复吗？`,
+      hidden ? '隐藏这条评论' : '恢复被隐藏的评论',
+      { type: 'warning', confirmButtonText: hidden ? '隐藏' : '恢复显示', cancelButtonText: '取消' })
   } catch { return }
   if (!current(token) || saving.value) return
   saving.value = true
   try {
-    await communityApi.restoreComment(row.id)
+    await communityApi.setCommentVisibility(row.id, hidden)
     if (!current(token)) return
-    ElMessage.success('评论已恢复显示')
+    ElMessage.success(hidden ? '评论已隐藏' : '评论已恢复显示')
     await load()
   } catch (e) {
-    if (current(token)) ElMessage.error(e instanceof Error ? e.message : '恢复失败，请重试')
+    if (current(token)) ElMessage.error(e instanceof Error ? e.message : `${hidden ? '隐藏' : '恢复'}失败，请重试`)
   } finally {
     if (current(token)) saving.value = false
   }

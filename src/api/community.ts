@@ -1,4 +1,4 @@
-import { get, post } from '@/utils/request'
+import { get, post, put } from '@/utils/request'
 
 export interface CommunityTag { code: string; name: string }
 export interface CommunityArticle {
@@ -35,7 +35,9 @@ export const communityApi = {
   retryAi: (id: string) => post(`/admin/v1/community/articles/${encodeURIComponent(id)}/retry-ai`),
   comments: (filters: { status: string; verdict: string; hidden: string; keyword: string; pageNum: number }) =>
     get<CommunityPage<AdminComment>>(`/admin/v1/community/comments?${query({ ...filters, keyword: filters.keyword.trim(), pageSize: 10 })}`),
-  restoreComment: (id: string) => post(`/admin/v1/community/comments/${encodeURIComponent(id)}/restore`),
+  /** 设置评论可见性：hidden=true 隐藏，false 恢复显示。人工动作与 AI 判定并存，互不改写。 */
+  setCommentVisibility: (id: string, hidden: boolean) =>
+    put(`/admin/v1/community/comments/${encodeURIComponent(id)}/visibility`, { hidden }),
   reports: (status: string, pageNum: number) => get<CommunityPage<CommunityReport>>(`/admin/v1/community/reports?${query({ status, pageNum, pageSize: 10 })}`),
   resolve: (id: string, action: string, note: string) => post(`/admin/v1/community/reports/${encodeURIComponent(id)}/resolve`, { action, note })
 }
