@@ -12,6 +12,7 @@
         >
           <el-button type="primary" :icon="Upload" :loading="uploading" :disabled="biz === 'all'">上传素材</el-button>
         </el-upload>
+        <el-progress v-if="uploading" :percentage="uploadPercent" :stroke-width="6" class="upload-progress" />
         <span class="text-muted tip">{{ tip }}</span>
       </div>
     </div>
@@ -68,6 +69,7 @@ const biz = ref<'all' | CmsMediaPurpose>('all')
 const list = ref<MediaFile[]>([])
 const loading = ref(false)
 const uploading = ref(false)
+const uploadPercent = ref(0)
 
 const tip = computed(() => {
   if (adminConfig.useMock) return '演示模式未接通对象存储，请关闭 Mock 后使用'
@@ -100,8 +102,11 @@ async function doUpload(options: { file: File; onSuccess: (body: unknown) => voi
     return
   }
   uploading.value = true
+  uploadPercent.value = 0
   try {
-    const uploaded = await cmsMediaApi.upload(options.file, biz.value)
+    const uploaded = await cmsMediaApi.upload(options.file, biz.value, (percent) => {
+      uploadPercent.value = percent
+    })
     ElMessage.success('上传成功')
     options.onSuccess(uploaded)
     await load()
@@ -111,6 +116,7 @@ async function doUpload(options: { file: File; onSuccess: (body: unknown) => voi
     options.onError(err)
   } finally {
     uploading.value = false
+    uploadPercent.value = 0
   }
 }
 
@@ -130,4 +136,5 @@ async function remove(row: MediaFile) {
 .toolbar-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .thumb { width: 72px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid var(--kt-line); background: #fff; }
 .tip { font-size: 12px; }
+.upload-progress { width: 160px; }
 </style>

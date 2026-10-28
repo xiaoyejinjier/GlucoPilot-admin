@@ -29,6 +29,9 @@ export interface CmsMediaOption {
   displayUrl: string
 }
 
+/** 上传进度回调，percent 为 0–100 的整数。 */
+export type UploadProgress = (percent: number) => void
+
 export function displayMediaUrl(fileUrl: string): string {
   if (!fileUrl) return ''
   if (/^https?:\/\//i.test(fileUrl)) return fileUrl
@@ -81,6 +84,38 @@ async function fetchItems(purpose?: CmsMediaPurpose | 'all'): Promise<CmsMediaIt
   return (await get<CmsMediaItem[]>(`/admin/v1/cms-media${query}`)) || []
 }
 
+/** PUT 直传，用 XHR 以便上报上传进度（fetch 拿不到 request 的上传进度）。 */
+function putWithProgress(
+  url: string,
+  file: File,
+  timeoutMs: number,
+  onProgress?: UploadProgress
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', url)
+    xhr.timeout = timeoutMs
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream')
+    xhr.upload.onprogress = (event) => {
+      if (onProgress && event.lengthComputable && event.total > 0) {
+        onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)))
+      }
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress?.(100)
+        resolve()
+      } else {
+        reject(new Error(`上传失败 (${xhr.status})，请重新选择`))
+      }
+    }
+    xhr.onerror = () => reject(new Error('上传失败，请检查网络后重试'))
+    xhr.ontimeout = () => reject(new Error('上传超时，请重新选择'))
+    xhr.onabort = () => reject(new Error('上传已取消'))
+    xhr.send(file)
+  })
+}
+
 export const cmsMediaApi = {
   async list(purpose?: CmsMediaPurpose | 'all'): Promise<MediaFile[]> {
     return (await fetchItems(purpose)).map(toMediaFile)
@@ -92,8 +127,9 @@ export const cmsMediaApi = {
 
   /**
    * 上传 JPG/PNG（≤5MB）或 MP4（purpose=news-video，≤100MB）。
+   * onProgress 仅覆盖对象直传阶段；随后的登记是轻量 JSON 请求。
    */
-  async upload(file: File, purpose: CmsMediaPurpose): Promise<CmsMediaOption> {
+  async upload(file: File, purpose: CmsMediaPurpose, onProgress?: UploadProgress): Promise<CmsMediaOption> {
     if (adminConfig.useMock) throw new Error('上传内容媒体需要连接后端，请关闭演示模式')
 
     const isVideo = purpose === 'news-video'
@@ -112,22 +148,8 @@ export const cmsMediaApi = {
     )
     const uploadUrl = resolveUploadUrl(credential.uploadUrl)
     const timeoutMs = isVideo ? 300000 : 60000
-    const controller = new AbortController()
-    const timer = window.setTimeout(() => controller.abort(), timeoutMs)
-    try {
-      const response = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': 'application/octet-stream' },
-        signal: controller.signal
-      })
-      if (!response.ok) throw new Error(`上传失败 (${response.status})，请重新选择`)
-    } catch (error) {
-      if ((error as Error).name === 'AbortError') throw new Error('上传超时，请重新选择')
-      throw error
-    } finally {
-      window.clearTimeout(timer)
-    }
+    onProgress?.(0)
+    await putWithProgress(uploadUrl, file, timeoutMs, onProgress)
 
     const idempotencyKey = typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()

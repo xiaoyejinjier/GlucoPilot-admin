@@ -40,6 +40,12 @@
                   上传 MP4（≤100MB）
                 </el-button>
               </el-upload>
+              <el-progress
+                v-if="videoUploading"
+                :percentage="videoUploadPercent"
+                :stroke-width="6"
+                class="upload-progress"
+              />
               <p class="tip text-muted">稳定路径 /api/v1/cms/videos/{id}，走对象存储（local/MinIO）。</p>
             </el-form-item>
             <el-form-item label="正文内容">
@@ -133,6 +139,7 @@ const channels: NewsChannel[] = ['企业动态', '行业快讯', '设备新知',
 const saving = ref(false)
 const uploading = ref(false)
 const videoUploading = ref(false)
+const videoUploadPercent = ref(0)
 const uploadedOptions = ref<CmsMediaOption[]>([])
 const editorRef = shallowRef<IDomEditor>()
 const id = Number(route.params.id || 0)
@@ -266,8 +273,11 @@ async function uploadCover(options: { file: File; onSuccess: (body: unknown) => 
 
 async function uploadVideo(options: { file: File; onSuccess: (body: unknown) => void; onError: (e: Error) => void }) {
   videoUploading.value = true
+  videoUploadPercent.value = 0
   try {
-    const uploaded = await cmsMediaApi.upload(options.file, 'news-video')
+    const uploaded = await cmsMediaApi.upload(options.file, 'news-video', (percent) => {
+      videoUploadPercent.value = percent
+    })
     form.videoUrl = uploaded.value
     ElMessage.success('视频已上传')
     options.onSuccess(uploaded)
@@ -277,6 +287,7 @@ async function uploadVideo(options: { file: File; onSuccess: (body: unknown) => 
     options.onError(err)
   } finally {
     videoUploading.value = false
+    videoUploadPercent.value = 0
   }
 }
 
@@ -325,6 +336,7 @@ async function save(status: NewsStatus) {
 .option-row { display: flex; align-items: center; gap: 8px; }
 .option-thumb { width: 36px; height: 24px; object-fit: cover; border-radius: 4px; border: 1px solid var(--kt-line); }
 .upload-btn { width: 100%; display: block; }
+.upload-progress { width: 100%; margin-top: 8px; }
 .rich-wrap {
   border: 1px solid var(--kt-line);
   border-radius: 8px;
