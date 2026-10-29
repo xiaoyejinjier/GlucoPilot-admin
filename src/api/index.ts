@@ -170,7 +170,8 @@ const remote = {
     const body = {
       title: n.title,
       summary: n.summary,
-      channel: n.channel,
+      tagCodes: n.tagCodes || [],
+      customTags: n.customTags || [],
       type: n.type,
       coverUrl: n.coverUrl,
       coverText: n.coverText,

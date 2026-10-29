@@ -2,7 +2,7 @@
   <div class="page-wrap moderation-page">
     <div class="head">
       <div>
-        <h2 class="page-title">{{ reportMode ? '社区举报管理' : '文章管理' }}</h2>
+        <h2 class="page-title">{{ reportMode ? '社区举报管理' : '社区文章管理' }}</h2>
         <p class="text-muted description">{{ reportMode ? '认真回应每一条反馈，一起维护友善的交流环境。' : '查看全部文章、发布人与状态，统一管理官方资讯和社区投稿。' }}</p>
       </div>
       <div class="heading-actions">
@@ -17,7 +17,7 @@
         <template v-if="!reportMode"><div class="filter-field"><label class="filter-label" for="article-source">文章来源</label><el-select id="article-source" v-model="source" placeholder="全部来源" :empty-values="[null, undefined]" @change="search"><el-option label="全部来源" value="" /><el-option label="官方资讯" value="OFFICIAL" /><el-option label="社区投稿" value="COMMUNITY" /></el-select></div><div class="filter-field keyword-field"><label class="filter-label" for="article-keyword">关键词</label><el-input id="article-keyword" v-model="keyword" placeholder="搜索标题或发布人" clearable maxlength="80" @clear="search" /></div></template>
         <div class="filter-actions"><el-button type="primary" native-type="submit">搜索</el-button><el-button native-type="button" @click="resetFilters">重置</el-button></div>
       </form>
-      <div class="filter-result"><span>共 <strong>{{ total }}</strong> {{ reportMode ? '条举报' : '篇文章' }}</span><span>{{ reportMode ? '按举报时间排序' : '按创建顺序排列，点击详情查看全文' }}</span></div>
+      <div class="filter-result"><span>共 <strong>{{ total }}</strong> {{ reportMode ? '条举报' : '篇文章' }}</span><span>{{ reportMode ? '按举报时间排序' : '按创建顺序排列' }}</span></div>
       <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon class="mb16" />
       <el-table v-if="reportMode" :data="reports" v-loading="loading" row-key="id" class="moderation-table">
         <el-table-column label="举报内容" min-width="240"><template #default="{row}"><div class="table-title">{{ targets[row.target_type] || row.target_type }} · #{{ row.target_id }}</div><div class="table-summary">{{ row.details || reasons[row.reason] || row.reason }}</div></template></el-table-column>
@@ -29,13 +29,25 @@
         <template #empty><el-empty :description="error ? '暂时无法加载举报，请稍后刷新' : '当前没有符合条件的举报'" :image-size="80" /></template>
       </el-table>
       <el-table v-else :data="articles" v-loading="loading" row-key="id" class="moderation-table">
+        <el-table-column prop="id" label="ID" width="70" />
         <el-table-column label="文章" min-width="270"><template #default="{row}"><div class="table-title">{{ row.title }}</div><div class="table-summary">{{ row.summary }}</div><div class="tag-list"><el-tag v-for="tag in row.tags" :key="tag.code" size="small" effect="plain" type="info">{{ tag.name }}</el-tag></div></template></el-table-column>
         <el-table-column label="发布人" min-width="140"><template #default="{row}"><div>{{ row.author?.nickname || '未记录发布人' }}</div><div class="table-summary">{{ row.author?.key || '—' }}</div></template></el-table-column>
         <el-table-column label="来源" min-width="100"><template #default="{row}"><el-tag effect="plain" :type="row.source === 'OFFICIAL' ? 'info' : 'success'">{{ row.source === 'OFFICIAL' ? '官方资讯' : '社区投稿' }}</el-tag></template></el-table-column>
         <el-table-column label="AI 初审" min-width="140"><template #default="{row}"><span v-if="row.source === 'OFFICIAL'" class="table-summary">官方资讯</span><template v-else><span class="ai-result" :class="{passed: row.aiVerdict === 'PASS', rejected: row.aiVerdict === 'REJECT'}">{{ aiText(row.aiVerdict) }}</span><div class="table-summary" :title="row.aiReason">{{ row.aiReason || '等待初审结果' }}</div></template></template></el-table-column>
         <el-table-column label="文章状态" min-width="110"><template #default="{row}"><el-tag :type="stateTone(row.state)">{{ stateNames[row.state] || row.state }}</el-tag></template></el-table-column>
         <el-table-column label="创建时间" min-width="155"><template #default="{row}">{{ date(row.createdAt) }}<div v-if="row.source !== 'OFFICIAL'" class="version">第 {{ row.revision }} 版</div></template></el-table-column>
-        <el-table-column label="操作" width="110" fixed="right"><template #default="{row}"><el-button link type="primary" @click="openArticle(row)">查看详情</el-button></template></el-table-column>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{row}">
+            <template v-if="canEdit">
+              <el-button link type="primary" @click="editArticle(row)">编辑</el-button>
+              <el-button v-if="row.state === 'PUBLISHED'" link type="warning" @click="unpublishArticle(row)">下架</el-button>
+              <el-popconfirm title="确认删除该文章？" @confirm="removeArticle(row)">
+                <template #reference><el-button link type="danger">删除</el-button></template>
+              </el-popconfirm>
+            </template>
+            <el-button v-else link type="primary" @click="openArticle(row)">查看详情</el-button>
+          </template>
+        </el-table-column>
         <template #empty><el-empty :description="error ? '暂时无法加载文章，请稍后刷新' : '当前没有符合条件的文章'" :image-size="80" /></template>
       </el-table>
       <div class="review-pagination"><span>每页 10 条</span><el-pagination background layout="prev, pager, next, jumper" :total="total" :page-size="10" :current-page="pageNum" :disabled="loading" @update:current-page="changePage" /></div>
@@ -69,6 +81,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
+import { api } from '@/api'
 import { communityApi, type CommunityArticle, type CommunityReport } from '@/api/community'
 import { useAuthStore } from '@/stores/auth'
 import { refreshWorkReminders } from '@/utils/work-reminders'
@@ -77,6 +90,7 @@ import ArticlePhoto from './ArticlePhoto.vue'
 const route = useRoute(), router = useRouter(), auth = useAuthStore()
 const reportMode = computed(() => route.path.endsWith('community-reports'))
 const canReview = computed(() => auth.role === 'admin' && auth.hasPermission('content:news:edit'))
+const canEdit = computed(() => auth.hasPermission('content:news:edit'))
 const stateNames: Record<string,string> = { DRAFT:'草稿', AI_PENDING:'等待初审', AI_REVIEWING:'AI 初审中', PENDING_ADMIN:'待管理员终审', AI_REJECTED:'初审未通过', AI_ERROR:'初审异常', PUBLISHED:'已发布', REJECTED:'已驳回', HIDDEN:'已下架' }
 const reportStates: Record<string,string> = { OPEN:'待处理', DISMISSED:'不成立', RESOLVED:'已处理' }
 const reasons: Record<string,string> = { MISINFORMATION:'健康信息不实', SPAM:'广告或垃圾信息', ABUSE:'攻击辱骂', PRIVACY:'泄露隐私', OTHER:'其他问题' }
@@ -121,6 +135,53 @@ async function openArticle(row: CommunityArticle) {
   try { const article = await communityApi.article(row.id); if (run === detailRun && drawer.value) selectedArticle.value = article }
   catch (e) { if (run === detailRun) detailError.value = (e as Error).message || '详情加载失败' }
   finally { if (run === detailRun) detailLoading.value = false }
+}
+function editArticle(row: CommunityArticle) {
+  if (row.source === 'OFFICIAL') {
+    router.push(`/content/news/${row.id}/edit`)
+    return
+  }
+  openArticle(row)
+}
+async function unpublishArticle(row: CommunityArticle) {
+  if (!canEdit.value || row.state !== 'PUBLISHED' || saving.value) return
+  saving.value = true
+  try {
+    await ElMessageBox.confirm('确认下架该文章？下架后将不再公开展示。', '确认下架', { type: 'warning' })
+  } catch {
+    saving.value = false
+    return
+  }
+  try {
+    if (row.source === 'OFFICIAL') {
+      await api.setNewsStatus(Number(row.id), 'unpublished')
+    } else {
+      if (!canReview.value) {
+        ElMessage.warning('社区投稿下架需要管理员权限')
+        return
+      }
+      await communityApi.review(row, 'HIDE', '管理员下架')
+    }
+    ElMessage.success('已下架')
+    await load()
+  } catch (e) {
+    ElMessage.error((e as Error).message || '下架失败，请重试')
+  } finally {
+    saving.value = false
+  }
+}
+async function removeArticle(row: CommunityArticle) {
+  if (!canEdit.value || saving.value) return
+  saving.value = true
+  try {
+    await api.removeNews(Number(row.id))
+    ElMessage.success('已删除')
+    await load()
+  } catch (e) {
+    ElMessage.error((e as Error).message || '删除失败，请重试')
+  } finally {
+    saving.value = false
+  }
 }
 function openReport(row: CommunityReport) { ++detailRun; detailLoading.value = false; detailError.value = ''; selectedArticle.value = null; selectedReport.value = row; note.value = ''; resolution.value = 'DISMISS'; drawer.value = true }
 async function decide(decision: string) {

@@ -114,15 +114,23 @@ export interface NineSlotResult {
 }
 
 /* ------- 内容 CMS ------- */
-export type NewsChannel = '企业动态' | '行业快讯' | '设备新知' | '控糖科普'
 export type NewsType = 'article' | 'video'
 export type NewsStatus = 'draft' | 'published' | 'unpublished'
+
+export interface NewsTag {
+  code: string
+  name: string
+}
 
 export interface News {
   id: number
   title: string
   summary: string
-  channel: NewsChannel
+  /** 兼容接口回传；新建/编辑以 tagCodes / customTags 为准 */
+  channel?: string
+  tagCodes?: string[]
+  customTags?: string[]
+  tags?: NewsTag[]
   type: NewsType
   coverUrl: string
   coverText: string

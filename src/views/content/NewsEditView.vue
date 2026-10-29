@@ -1,8 +1,8 @@
 <template>
   <div class="page-wrap">
     <div class="head mb16">
-      <el-button :icon="ArrowLeft" @click="$router.push('/content/news')">返回列表</el-button>
-      <h2 class="page-title">{{ isEdit ? '编辑资讯' : '新建资讯' }}</h2>
+      <el-button :icon="ArrowLeft" @click="$router.push('/content/community')">返回列表</el-button>
+      <h2 class="page-title">{{ isEdit ? '编辑官方文章' : '新建官方文章' }}</h2>
       <el-button type="primary" :loading="saving" @click="save('draft')">{{ isEdit ? '保存' : '存为草稿' }}</el-button>
       <el-button type="success" :loading="saving" @click="save('published')">保存并发布</el-button>
     </div>
@@ -17,10 +17,28 @@
             <el-form-item label="摘要">
               <el-input v-model="form.summary" type="textarea" :rows="2" maxlength="140" show-word-limit placeholder="列表页展示的摘要" />
             </el-form-item>
-            <el-form-item label="频道" required>
-              <el-radio-group v-model="form.channel">
-                <el-radio-button v-for="c in channels" :key="c" :value="c">{{ c }}</el-radio-button>
-              </el-radio-group>
+            <el-form-item label="标签" required>
+              <div class="tag-compose" v-loading="tagsLoading">
+                <div class="compose-tags">
+                  <button
+                    v-for="t in officialTags"
+                    :key="t.code"
+                    type="button"
+                    class="compose-tag"
+                    :class="{ on: tagCodes.includes(t.code) }"
+                    @click="toggleOfficial(t.code)"
+                  ># {{ t.name }}</button>
+                  <button
+                    v-for="name in customTags"
+                    :key="`c-${name}`"
+                    type="button"
+                    class="compose-tag on custom"
+                    @click="removeCustom(name)"
+                  ># {{ name }} <span>×</span></button>
+                  <button type="button" class="compose-tag plus" @click="openTagPicker">＋</button>
+                </div>
+                <p class="tip text-muted">已选 {{ tagCount }} / 3 · 点固定标签选用，点＋搜索更多或自建标签</p>
+              </div>
             </el-form-item>
             <el-form-item label="内容类型">
               <el-radio-group v-model="form.type">
@@ -111,10 +129,42 @@
             <el-descriptions-item label="当前状态">{{ isEdit ? statusText : '新建草稿' }}</el-descriptions-item>
             <el-descriptions-item label="更新时间">{{ form.updatedAt || '—' }}</el-descriptions-item>
           </el-descriptions>
-          <p class="tip text-muted">发布后立即在小程序首页对应频道可见。</p>
+          <p class="tip text-muted">发布后按所选标签在社区侧可见。</p>
         </div>
       </el-col>
     </el-row>
+
+    <el-dialog v-model="tagPickerOpen" title="选择标签" width="480px" destroy-on-close append-to-body>
+      <p class="picker-hint">已选 {{ tagCount }} / 3 · 可搜索标签库，也可在下方添加新标签</p>
+      <el-input v-model="tagSearch" clearable placeholder="搜索标签名称" class="mb12" />
+      <div class="picker-list">
+        <button
+          v-for="t in filteredPickerTags"
+          :key="t.code"
+          type="button"
+          class="picker-row"
+          :class="{ on: tagCodes.includes(t.code) }"
+          @click="toggleOfficial(t.code)"
+        >
+          <span># {{ t.name }}</span>
+          <span class="picker-mark">{{ tagCodes.includes(t.code) ? '✓' : '' }}</span>
+        </button>
+        <el-empty v-if="!filteredPickerTags.length" description="没有匹配的标签" :image-size="56" />
+      </div>
+      <div class="picker-create">
+        <el-input
+          v-model="customInput"
+          maxlength="16"
+          show-word-limit
+          placeholder="自定义标签，最多 16 字"
+          @keyup.enter="addCustomFromPicker"
+        />
+        <el-button type="primary" :disabled="!customInput.trim()" @click="addCustomFromPicker">添加</el-button>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="tagPickerOpen = false">完成</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -127,29 +177,49 @@ import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
 import type { IDomEditor, IEditorConfig, IToolbarConfig } from '@wangeditor/editor'
 import '@wangeditor/editor/dist/css/style.css'
 import { api } from '@/api'
+import { communityTagsApi, type ManagedTag } from '@/api/community-tags'
 import { cmsMediaApi, displayMediaUrl, type CmsMediaOption } from '@/api/cms-media'
 import { useAuthStore } from '@/stores/auth'
-import type { News, NewsChannel, NewsStatus } from '@/types'
+import type { News, NewsStatus } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
-const channels: NewsChannel[] = ['企业动态', '行业快讯', '设备新知', '控糖科普']
 
 const saving = ref(false)
 const uploading = ref(false)
 const videoUploading = ref(false)
 const videoUploadPercent = ref(0)
+const tagsLoading = ref(false)
+const tagOptions = ref<ManagedTag[]>([])
+const tagCodes = ref<string[]>([])
+const customTags = ref<string[]>([])
+const tagPickerOpen = ref(false)
+const tagSearch = ref('')
+const customInput = ref('')
 const uploadedOptions = ref<CmsMediaOption[]>([])
 const editorRef = shallowRef<IDomEditor>()
 const id = Number(route.params.id || 0)
 const isEdit = computed(() => !!id && id > 0)
+const tagCount = computed(() => tagCodes.value.length + customTags.value.length)
+/** 首页同款固定官方话题（排除 other / 自定义） */
+const officialTags = computed(() =>
+  tagOptions.value.filter((t) => t.type !== 'USER' && !String(t.code).startsWith('custom_') && t.code !== 'other')
+)
+const filteredPickerTags = computed(() => {
+  const q = tagSearch.value.trim().toLowerCase()
+  const rows = tagOptions.value.filter((t) => t.code !== 'other')
+  if (!q) return rows
+  return rows.filter((t) => t.name.toLowerCase().includes(q) || t.code.toLowerCase().includes(q))
+})
 
 const form = reactive<News>({
   id: 0,
   title: '',
   summary: '',
-  channel: '控糖科普',
+  tagCodes: [],
+  customTags: [],
+  tags: [],
   type: 'article',
   coverUrl: '',
   coverText: '',
@@ -216,6 +286,76 @@ function contentForEditor(html: string): string {
   )
 }
 
+async function loadTags() {
+  tagsLoading.value = true
+  try {
+    const all = await communityTagsApi.list({ keyword: '', type: '', enabled: '1', pageNum: 1, pageSize: 50 })
+    tagOptions.value = all.records
+  } catch (e) {
+    tagOptions.value = []
+    ElMessage.error((e as Error).message || '加载标签失败')
+  } finally {
+    tagsLoading.value = false
+  }
+}
+
+function openTagPicker() {
+  tagSearch.value = ''
+  customInput.value = ''
+  tagPickerOpen.value = true
+}
+
+function toggleOfficial(code: string) {
+  const i = tagCodes.value.indexOf(code)
+  if (i >= 0) {
+    tagCodes.value = tagCodes.value.filter((c) => c !== code)
+    return
+  }
+  if (tagCount.value >= 3) {
+    ElMessage.warning('最多选择 3 个标签')
+    return
+  }
+  // 若同名自定义已选，去掉自定义改用官方 code
+  const hit = tagOptions.value.find((t) => t.code === code)
+  if (hit) {
+    customTags.value = customTags.value.filter((n) => n.toLowerCase() !== hit.name.toLowerCase())
+  }
+  tagCodes.value = [...tagCodes.value, code]
+}
+
+function removeCustom(name: string) {
+  customTags.value = customTags.value.filter((n) => n !== name)
+}
+
+function addCustomFromPicker() {
+  const name = customInput.value.replace(/^#+/, '').trim().replace(/\s+/g, ' ')
+  if (!name) return
+  if (!/^[\p{L}\p{N} _-]{1,16}$/u.test(name)) {
+    ElMessage.warning('标签限 1～16 字，可用中文、字母和数字')
+    return
+  }
+  const builtin = tagOptions.value.find((t) => t.name.toLowerCase() === name.toLowerCase())
+  if (builtin) {
+    if (!tagCodes.value.includes(builtin.code) && tagCount.value >= 3) {
+      ElMessage.warning('最多选择 3 个标签')
+      return
+    }
+    if (!tagCodes.value.includes(builtin.code)) tagCodes.value = [...tagCodes.value, builtin.code]
+    customInput.value = ''
+    return
+  }
+  if (customTags.value.some((n) => n.toLowerCase() === name.toLowerCase())) {
+    customInput.value = ''
+    return
+  }
+  if (tagCount.value >= 3) {
+    ElMessage.warning('最多选择 3 个标签')
+    return
+  }
+  customTags.value = [...customTags.value, name]
+  customInput.value = ''
+}
+
 async function loadUploaded() {
   try {
     uploadedOptions.value = await cmsMediaApi.listOptions('news')
@@ -225,16 +365,43 @@ async function loadUploaded() {
 }
 
 async function load() {
-  await loadUploaded()
+  await Promise.all([loadTags(), loadUploaded()])
   if (!isEdit.value) return
   try {
     const list = await api.listNews()
     const target = list.find((n) => n.id === id)
     if (target) {
+      const tags = target.tags || []
+      for (const t of tags) {
+        if (!tagOptions.value.some((o) => o.code === t.code)) {
+          tagOptions.value = [...tagOptions.value, {
+            id: t.code,
+            code: t.code,
+            name: t.name,
+            type: t.code.startsWith('custom_') ? 'USER' : 'OFFICIAL',
+            sortNo: 0,
+            enabled: 1,
+            articleCount: 0
+          }]
+        }
+      }
+      const codes: string[] = []
+      const customs: string[] = []
+      for (const t of tags) {
+        if (t.code && !String(t.code).startsWith('custom_') && t.code !== 'other') {
+          if (!codes.includes(t.code)) codes.push(t.code)
+        } else if (t.name && !customs.includes(t.name)) {
+          customs.push(t.name)
+        }
+      }
       Object.assign(form, target, {
         coverText: '',
+        tagCodes: codes,
+        customTags: customs,
         content: contentForEditor(target.content || '')
       })
+      tagCodes.value = codes
+      customTags.value = customs
     }
   } catch (e) {
     ElMessage.error((e as Error).message || '加载资讯失败')
@@ -296,6 +463,16 @@ async function save(status: NewsStatus) {
     ElMessage.warning('请填写标题')
     return
   }
+  if (tagCount.value < 1 || tagCount.value > 3) {
+    ElMessage.warning('请选择或添加 1～3 个标签')
+    return
+  }
+  for (const name of customTags.value) {
+    if (!/^[\p{L}\p{N} _-]{1,16}$/u.test(name)) {
+      ElMessage.warning(`标签「${name}」不合法：限 1～16 字，可用中文、字母和数字`)
+      return
+    }
+  }
   saving.value = true
   try {
     form.status = status
@@ -304,6 +481,8 @@ async function save(status: NewsStatus) {
     }
     const payload = {
       ...form,
+      tagCodes: [...tagCodes.value],
+      customTags: [...customTags.value],
       coverText: '',
       content: contentForSave(form.content)
     }
@@ -318,7 +497,7 @@ async function save(status: NewsStatus) {
       )
     }
     ElMessage.success(status === 'published' ? '已保存并发布' : '已保存')
-    router.push('/content/news')
+    router.push('/content/community')
   } finally {
     saving.value = false
   }
@@ -347,4 +526,49 @@ async function save(status: NewsStatus) {
 .rich-toolbar { border-bottom: 1px solid var(--kt-line); }
 .rich-editor { min-height: 320px; }
 .rich-editor :deep(.w-e-text-container) { min-height: 320px !important; }
+.tag-compose { width: 100%; min-height: 40px; }
+.compose-tags { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.compose-tag {
+  border: 1px solid var(--kt-line);
+  background: #f7faf8;
+  color: var(--kt-ink);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.compose-tag.on { background: #e8f6ef; border-color: #b7dfc8; color: #18845a; font-weight: 600; }
+.compose-tag.custom span { margin-left: 6px; color: var(--kt-muted); }
+.compose-tag.plus {
+  min-width: 36px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-style: dashed;
+  color: #18845a;
+  background: #f2faf6;
+  border-color: #b7dfc8;
+  font-size: 18px;
+  font-weight: 600;
+}
+.picker-hint { margin: 0 0 12px; font-size: 13px; color: var(--kt-muted); }
+.mb12 { margin-bottom: 12px; }
+.picker-list { max-height: 280px; overflow: auto; border: 1px solid var(--kt-line); border-radius: 8px; padding: 6px; }
+.picker-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--kt-ink);
+}
+.picker-row:hover { background: #f5f7f6; }
+.picker-row.on { background: #e8f6ef; color: #18845a; font-weight: 600; }
+.picker-mark { width: 18px; text-align: center; }
+.picker-create { display: flex; gap: 10px; margin-top: 14px; }
 </style>
