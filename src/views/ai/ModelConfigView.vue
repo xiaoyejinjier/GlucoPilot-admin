@@ -65,6 +65,13 @@
         <el-table-column label="厂商" width="120">
           <template #default="{ row }">{{ providerText(row) }}</template>
         </el-table-column>
+        <el-table-column label="用途" width="86" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.modelType === 'VISION' ? 'warning' : 'info'" size="small" effect="plain">
+              {{ row.modelTypeText || (row.modelType === 'VISION' ? '视觉' : '文本') }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="模型名(endpoint)" min-width="170" show-overflow-tooltip>
           <template #default="{ row }">{{ row.modelEndpoint || '—' }}</template>
         </el-table-column>
@@ -183,6 +190,15 @@
             <el-option v-for="p in PROVIDER_OPTIONS" :key="p.value" :label="p.label" :value="p.value" />
           </el-select>
         </el-form-item>
+        <el-form-item label="用途" prop="modelType">
+          <el-select v-model="form.modelType" style="width: 100%">
+            <el-option v-for="t in MODEL_TYPE_OPTIONS" :key="t.value" :label="t.label" :value="t.value" />
+          </el-select>
+          <div class="text-muted key-tip">
+            文本模型供对话/摘要/记忆抽取使用，视觉模型供看图描述与识别血糖使用。
+            同一用途同时只有一个默认模型——把视觉模型设为默认不会影响文本对话。
+          </div>
+        </el-form-item>
         <el-form-item label="模型名(endpoint)" prop="modelEndpoint">
           <el-input v-model="form.modelEndpoint" placeholder="真正发给 provider 的模型名，如 deepseek-chat" />
         </el-form-item>
@@ -205,9 +221,9 @@
           <span class="text-muted inline-tip">建议不超过 15000，否则前端会先超时</span>
         </el-form-item>
         <el-form-item label="深度思考">
-          <el-switch v-model="form.thinking" :disabled="Number(form.providerCode) !== 1" />
+          <el-switch v-model="form.thinking" :disabled="!thinkingEnabled" />
           <span class="text-muted inline-tip">
-            {{ Number(form.providerCode) === 1 ? '仅 DeepSeek 自研模型生效' : '仅厂商为 DeepSeek 自研时可开启' }}
+            {{ thinkingHint }}
           </span>
         </el-form-item>
 
@@ -317,6 +333,15 @@ const PROVIDER_OPTIONS = [
   { value: 5, label: '其他' }
 ]
 
+/**
+ * 用途：文本 / 视觉。与「厂商（协议）」正交——同一厂商可以既有文本模型又有视觉模型。
+ * 字段是批次 2 新增的，缺失按 TEXT 处理（历史行与旧页面都这样）。
+ */
+const MODEL_TYPE_OPTIONS: Array<{ value: 'TEXT' | 'VISION'; label: string }> = [
+  { value: 'TEXT', label: '文本（对话 / 摘要 / 记忆）' },
+  { value: 'VISION', label: '视觉（看图描述 / 识别血糖）' }
+]
+
 const TEST_CATEGORY_TEXT: Record<AiTestCategory, string> = {
   OK: '正常',
   AUTH: '鉴权失败',
@@ -331,6 +356,7 @@ interface ModelForm {
   modelCode: string
   modelName: string
   providerCode: number
+  modelType: 'TEXT' | 'VISION'
   apiBaseUrl: string
   modelEndpoint: string
   // el-input-number 的 modelValue 是 number | null，清空时回传 null，这里都留出 undefined 余量
@@ -367,6 +393,7 @@ function emptyForm(): ModelForm {
     modelCode: '',
     modelName: '',
     providerCode: 1,
+    modelType: 'TEXT',
     apiBaseUrl: '',
     modelEndpoint: '',
     temperature: null,
@@ -403,6 +430,17 @@ const currentKeyText = computed(() => {
   if (!editing.value) return '未配置（新增）'
   return `${editing.value.apiKeyMasked || '未配置'}（${keySourceText(editing.value.apiKeySource)}）`
 })
+/**
+ * 深度思考只对「DeepSeek 自研 + 文本用途」有意义：
+ * 视觉通道走 OpenAI 兼容协议，请求里根本没有这个入参（后端启动时会 WARN 提示该行是死配置）。
+ */
+const thinkingEnabled = computed(() => Number(form.providerCode) === 1 && form.modelType !== 'VISION')
+const thinkingHint = computed(() => {
+  if (form.modelType === 'VISION') return '视觉模型（OpenAI 兼容协议）没有这个入参，填了也不生效'
+  if (Number(form.providerCode) !== 1) return '仅厂商为 DeepSeek 自研时可开启'
+  return '仅 DeepSeek 自研模型生效'
+})
+
 const dialogTesting = computed(() => Boolean(editing.value) && testingId.value === editing.value?.id)
 const dialogTestTitle = computed(() => {
   const res = dialogTest.value
@@ -464,6 +502,8 @@ function fillForm(row: AiModelRow) {
   form.modelCode = row.modelCode || ''
   form.modelName = row.modelName || ''
   form.providerCode = Number(row.providerCode) || 1
+  // 用途缺失的历史行按 TEXT 回填（与后端"NULL 视为文本"一致）：不回填会让用户一保存就改变语义
+  form.modelType = row.modelType === 'VISION' ? 'VISION' : 'TEXT'
   form.apiBaseUrl = row.apiBaseUrl || ''
   form.modelEndpoint = row.modelEndpoint || ''
   form.temperature = row.temperature ?? null
@@ -516,13 +556,14 @@ function buildPayload(): AiModelSavePayload {
   const payload: AiModelSavePayload = {
     modelName: form.modelName.trim(),
     providerCode: Number(form.providerCode),
+    modelType: form.modelType,
     apiBaseUrl: blankToNull(form.apiBaseUrl),
     modelEndpoint: form.modelEndpoint.trim(),
     temperature: form.temperature ?? null,
     topP: form.topP ?? null,
     maxTokens: form.maxTokens ?? null,
-    // 深度思考只对 DeepSeek 自研有意义，其他厂商显式置空，避免脏配置
-    thinking: Number(form.providerCode) === 1 ? form.thinking : null,
+    // 深度思考只对「DeepSeek 自研 + 文本用途」有意义，其余显式置空，避免脏配置
+    thinking: thinkingEnabled.value ? form.thinking : null,
     timeoutMs: form.timeoutMs ?? null,
     isEnabled: form.enabled ? 1 : 0,
     isDefault: form.isDefault ? 1 : 0,

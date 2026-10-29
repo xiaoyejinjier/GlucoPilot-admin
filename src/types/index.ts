@@ -297,6 +297,10 @@ export interface AiModelRow {
   providerCode: AiProviderCode | number
   /** 后端下发的展示文案，优先用它渲染 */
   providerText: string
+  /** 模型用途：TEXT=文本 / VISION=视觉（多模态）。历史行可能为空，按 TEXT 处理 */
+  modelType?: 'TEXT' | 'VISION' | null
+  /** 后端下发的用途文案（文本/视觉） */
+  modelTypeText?: string
   apiBaseUrl?: string | null
   /** 真正发给 provider 的模型名 */
   modelEndpoint: string
@@ -336,6 +340,8 @@ export interface AiModelSavePayload {
   modelCode?: string
   modelName: string
   providerCode: number
+  /** 模型用途：留空后端按 TEXT（兼容旧页面）；非法值后端返回 400 */
+  modelType?: 'TEXT' | 'VISION' | null
   apiBaseUrl?: string | null
   modelEndpoint: string
   temperature?: number | null

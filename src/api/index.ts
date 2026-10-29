@@ -544,6 +544,9 @@ function normalizeAiModelRow(row: AiModelRow): AiModelRow {
     modelName: row.modelName || '',
     providerCode: Number(row.providerCode) || 0,
     providerText: row.providerText || '',
+    // 用途：历史行 modelType 为空 → 按 TEXT 展示（与后端"NULL 视为文本"对齐）
+    modelType: row.modelType === 'VISION' ? 'VISION' : 'TEXT',
+    modelTypeText: row.modelTypeText || (row.modelType === 'VISION' ? '视觉' : '文本'),
     modelEndpoint: row.modelEndpoint || '',
     isDefault: Number(row.isDefault) === 1 ? 1 : 0,
     isEnabled: Number(row.isEnabled) === 1 ? 1 : 0,
