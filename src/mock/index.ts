@@ -46,7 +46,7 @@ interface DBShape {
   logs: OperationLog[]
 }
 
-const CHANNELS: Array<News['channel']> = ['企业动态', '行业快讯', '设备新知', '控糖科普']
+const CHANNELS: string[] = ['企业动态', '行业快讯', '设备新知', '控糖科普']
 
 function seed(): DBShape {
   const users: AppUser[] = Array.from({ length: 38 }, (_, i) => {

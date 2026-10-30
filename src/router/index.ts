@@ -33,13 +33,13 @@ export const routes: RouteRecordRaw[] = [
     redirect: '/dashboard',
     children: [
       { path: 'dashboard', name: 'dashboard', component: () => import('@/views/dashboard/DashboardView.vue'), meta: { title: '数据看板', icon: 'DataBoard', roles: ['admin', 'editor'], permission: 'dashboard:view' } },
-      { path: 'content/news', name: 'news', component: () => import('@/views/content/NewsListView.vue'), meta: { title: '资讯管理', icon: 'Document', roles: ['admin', 'editor'], permission: 'content:news:list' } },
-      { path: 'content/community', name: 'community-review', component: () => import('@/views/content/CommunityReviewView.vue'), meta: { title: '文章管理', icon: 'DocumentChecked', roles: ['admin', 'editor'], permission: 'content:news:list' } },
+      { path: 'content/community', name: 'community-review', component: () => import('@/views/content/CommunityReviewView.vue'), meta: { title: '社区文章管理', icon: 'DocumentChecked', roles: ['admin', 'editor'], permission: 'content:news:list' } },
       { path: 'content/community-reports', name: 'community-reports', component: () => import('@/views/content/CommunityReviewView.vue'), meta: { title: '社区举报管理', icon: 'Warning', roles: ['admin', 'editor'], permission: 'content:news:list' } },
       { path: 'content/community-comments', name: 'community-comments', component: () => import('@/views/content/CommunityCommentsView.vue'), meta: { title: '社区评论管理', icon: 'ChatDotSquare', roles: ['admin', 'editor'], permission: 'content:news:list' } },
       { path: 'content/community-tags', name: 'community-tags', component: () => import('@/views/content/CommunityTagsView.vue'), meta: { title: '社区标签管理', icon: 'CollectionTag', roles: ['admin', 'editor'], permission: 'content:news:list' } },
-      { path: 'content/news/new', name: 'news-new', component: () => import('@/views/content/NewsEditView.vue'), meta: { title: '新建资讯', roles: ['admin', 'editor'], hidden: true, permission: 'content:news:edit' } },
-      { path: 'content/news/:id/edit', name: 'news-edit', component: () => import('@/views/content/NewsEditView.vue'), meta: { title: '编辑资讯', roles: ['admin', 'editor'], hidden: true, permission: 'content:news:edit' } },
+      { path: 'content/news/new', name: 'news-new', component: () => import('@/views/content/NewsEditView.vue'), meta: { title: '新建官方文章', roles: ['admin', 'editor'], hidden: true, permission: 'content:news:edit' } },
+      { path: 'content/news/:id/edit', name: 'news-edit', component: () => import('@/views/content/NewsEditView.vue'), meta: { title: '编辑官方文章', roles: ['admin', 'editor'], hidden: true, permission: 'content:news:edit' } },
+      { path: 'content/news', redirect: '/content/community' },
       { path: 'content/media', name: 'media', component: () => import('@/views/content/MediaView.vue'), meta: { title: '媒体素材', icon: 'FolderOpened', roles: ['admin', 'editor'], permission: 'content:media:manage' } },
       { path: 'nutrition/foods', name: 'foods', component: () => import('@/views/nutrition/FoodView.vue'), meta: { title: '营养库管理', icon: 'Apple', roles: ['admin', 'editor'], permission: 'food:library:manage' } },
       { path: 'users', name: 'users', component: () => import('@/views/users/UserListView.vue'), meta: { title: '用户管理', icon: 'User', roles: ['admin'], permission: 'user:manage' } },
@@ -96,8 +96,7 @@ export const menuGroups: MenuGroup[] = [
   {
     title: '内容管理', icon: 'Document', roles: ['admin', 'editor'],
     children: [
-      { path: '/content/community', title: '文章管理', icon: 'DocumentChecked', permission: 'content:news:list' },
-      { path: '/content/news', title: '官方资讯编辑', icon: 'Document', permission: 'content:news:list' },
+      { path: '/content/community', title: '社区文章管理', icon: 'DocumentChecked', permission: 'content:news:list' },
       { path: '/content/community-reports', title: '社区举报管理', icon: 'Warning', permission: 'content:news:list' },
       { path: '/content/community-comments', title: '社区评论管理', icon: 'ChatDotSquare', permission: 'content:news:list' },
       { path: '/content/community-tags', title: '社区标签管理', icon: 'CollectionTag', permission: 'content:news:list' },
