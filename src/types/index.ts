@@ -460,6 +460,10 @@ export interface AiSceneModelOption {
   providerCode: number
   isDefault: boolean
   providerName: string
+  /** 能力集合（如 text,tool,stream / vision,stream）：页面按场景用途过滤下拉 */
+  capability?: string | null
+  /** 能力中文（「文本 / 工具 / 流式」） */
+  capabilityText?: string
 }
 
 export interface AiSceneRow {

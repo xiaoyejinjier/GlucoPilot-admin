@@ -696,7 +696,10 @@ function normalizeSceneModel(model: AiSceneModelOption): AiSceneModelOption {
     name: model.name || model.code || '',
     providerCode: Number(model.providerCode) || 0,
     isDefault: model.isDefault === true,
-    providerName: model.providerName || ''
+    providerName: model.providerName || '',
+    // 历史行后端会按 text 兜底，这里同样兜底，避免老数据让下拉全空
+    capability: (model.capability || '').trim() || 'text',
+    capabilityText: model.capabilityText || '文本'
   }
 }
 

@@ -150,15 +150,23 @@
               :placeholder="editing.modelCodeApplies ? '留空 = 继承（走 yaml / 通道默认）' : '该场景不支持逐场景绑定模型'"
             >
               <el-option
-                v-for="m in models"
+                v-for="m in selectableModels"
                 :key="m.code"
                 :label="modelLabel(m)"
                 :value="m.code"
               />
+              <el-option
+                v-for="m in unavailableModels"
+                :key="m.code"
+                :label="modelLabel(m) + '（能力不匹配，已隐藏）'"
+                :value="m.code"
+                disabled
+              />
             </el-select>
             <div class="text-muted field-tip">
               <template v-if="editing.modelCodeApplies">
-                只能绑定存在且已启用的模型（后端会校验，未启用会返回 400）；留空表示不在这一层做覆盖。
+                下拉只列能力匹配的模型（视觉场景要含 vision、文本场景要含 text）；后端保存时会再校验一次，
+                能力不匹配直接返回 400。
               </template>
               <template v-else>
                 模型编码固定不生效：视觉场景的模型由视觉通道统一解析，这一栏不可编辑。
@@ -296,9 +304,27 @@ function thinkingText(value: boolean | null | undefined): string {
 function modelLabel(m: AiSceneModelOption): string {
   const parts = [`${m.name || m.code}（${m.code}）`]
   if (m.providerName) parts.push(m.providerName)
+  if (m.capabilityText) parts.push(m.capabilityText)
   if (m.isDefault) parts.push('默认')
   return parts.join(' · ')
 }
+
+/** 当前正在编辑的场景要的能力 token：视觉场景要 vision，文本场景要 text。 */
+function requiredCapability(): string {
+  return editing.value?.requiresVision ? 'vision' : 'text'
+}
+
+function supportsScene(m: AiSceneModelOption): boolean {
+  return (m.capability || 'text').split(',').map((t) => t.trim()).includes(requiredCapability())
+}
+
+/** 能力匹配的可选项。 */
+const selectableModels = computed(() => models.value.filter(supportsScene))
+/**
+ * 能力不匹配的模型：不隐藏、而是置灰展示。
+ * 直接过滤掉会让运营以为"模型没配好"；置灰带原因才能解释"为什么我配的视觉模型不在这里"。
+ */
+const unavailableModels = computed(() => models.value.filter((m) => !supportsScene(m)))
 
 async function load() {
   loading.value = true
