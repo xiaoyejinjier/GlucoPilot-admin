@@ -553,6 +553,8 @@ function normalizeAiModelRow(row: AiModelRow): AiModelRow {
     isEnabled: Number(row.isEnabled) === 1 ? 1 : 0,
     apiKeyMasked: row.apiKeyMasked || '',
     apiKeySource: row.apiKeySource || 'none',
+    // 保存时跳过了连通性校验的说明；null 表示保存时校验过（或早于 V51 的历史行）
+    verifySkippedReason: row.verifySkippedReason || null,
     configVersion: Number(row.configVersion) || 0,
     source: row.source === 'db' ? 'db' : 'yaml'
   }

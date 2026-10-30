@@ -137,7 +137,16 @@
         </el-table-column>
         <el-table-column label="最近测试" width="104" align="center">
           <template #default="{ row }">
-            <el-tooltip v-if="hasTestResult(row)" placement="top">
+            <el-tooltip v-if="row.verifySkippedReason" placement="top">
+              <template #content>
+                <div class="tip-box">
+                  <div>保存时跳过了连通性校验</div>
+                  <div class="tip-time">原因：{{ row.verifySkippedReason }}</div>
+                </div>
+              </template>
+              <el-tag type="warning" size="small" effect="light">未校验</el-tag>
+            </el-tooltip>
+            <el-tooltip v-else-if="hasTestResult(row)" placement="top">
               <template #content>
                 <div class="tip-box">
                   <div>{{ row.lastTestMessage || '后端未返回详情' }}</div>
@@ -282,6 +291,22 @@
           <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="可空" />
         </el-form-item>
 
+        <el-form-item label="跳过连通性校验">
+          <el-switch v-model="form.skipVerify" />
+          <span class="text-muted inline-tip">
+            默认在保存时真发一次探针（文本 ping、视觉发一张 1×1 图）。只有「暂时连不通但想先录进来」才跳过
+          </span>
+        </el-form-item>
+        <el-form-item v-if="form.skipVerify" label="跳过原因" prop="verifySkipReason">
+          <el-input
+            v-model="form.verifySkipReason"
+            maxlength="255"
+            show-word-limit
+            placeholder="必填：为什么这次不校验（例如：厂商账号还没开通）"
+          />
+          <span class="text-muted inline-tip">原因会落库并在列表里显示，方便事后追溯</span>
+        </el-form-item>
+
         <el-form-item v-if="isEdit && editing && editing.lastTestAt" label="最近测试">
           <span class="text-muted" style="font-size: 12px">
             {{ editing.lastTestOk ? '成功' : '失败' }} · {{ fmtTime(editing.lastTestAt) }} ·
@@ -410,6 +435,10 @@ interface ModelForm {
   enabled: boolean
   isDefault: boolean
   remark: string
+  /** 本次保存跳过连通性校验（默认 false） */
+  skipVerify: boolean
+  /** 跳过原因，skipVerify=true 时必填 */
+  verifySkipReason: string
 }
 
 const auth = useAuthStore()
@@ -444,7 +473,9 @@ function emptyForm(): ModelForm {
     clearApiKey: false,
     enabled: true,
     isDefault: false,
-    remark: ''
+    remark: '',
+    skipVerify: false,
+    verifySkipReason: ''
   }
 }
 const form = reactive<ModelForm>(emptyForm())
@@ -559,6 +590,9 @@ function fillForm(row: AiModelRow) {
   form.enabled = Number(row.isEnabled) === 1
   form.isDefault = Number(row.isDefault) === 1
   form.remark = row.remark || ''
+  // 每次打开弹窗都从「不跳过」开始：跳过是例外，默认必须真校验一次
+  form.skipVerify = false
+  form.verifySkipReason = ''
 }
 
 function clearSecret() {
@@ -610,6 +644,10 @@ function buildPayload(): AiModelSavePayload {
     isEnabled: form.enabled ? 1 : 0,
     isDefault: form.isDefault ? 1 : 0,
     remark: blankToNull(form.remark)
+  }
+  if (form.skipVerify) {
+    payload.skipVerify = true
+    payload.verifySkipReason = blankToNull(form.verifySkipReason)
   }
   // 模型编码是引用键，修改时不允许变更，因此只在新增时提交
   if (!isEdit.value) payload.modelCode = form.modelCode.trim()

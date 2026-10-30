@@ -331,6 +331,8 @@ export interface AiModelRow {
   lastTestAt?: string | null
   lastTestOk?: boolean | null
   lastTestMessage?: string | null
+  /** 保存时跳过了连通性校验的原因（V51）。null/undefined = 保存时校验过 */
+  verifySkippedReason?: string | null
   remark?: string | null
   updatedAt?: string | null
 }
@@ -364,6 +366,10 @@ export interface AiModelSavePayload {
   isEnabled: number
   isDefault: number
   remark?: string | null
+  /** 新增/编辑保存时跳过连通性校验（默认 false，服务端会真发一次探针） */
+  skipVerify?: boolean
+  /** 跳过校验的原因；skipVerify=true 时必填 */
+  verifySkipReason?: string | null
   /** 修改时必填 */
   configVersion?: number
 }
