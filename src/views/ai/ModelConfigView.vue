@@ -65,10 +65,17 @@
         <el-table-column label="厂商" width="120">
           <template #default="{ row }">{{ providerText(row) }}</template>
         </el-table-column>
-        <el-table-column label="用途" width="86" align="center">
+        <el-table-column label="能力" width="170" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.modelType === 'VISION' ? 'warning' : 'info'" size="small" effect="plain">
-              {{ row.modelTypeText || (row.modelType === 'VISION' ? '视觉' : '文本') }}
+            <el-tag
+              v-for="token in capabilityTokens(row.capability)"
+              :key="token.value"
+              :type="token.value === 'vision' ? 'warning' : 'info'"
+              size="small"
+              effect="plain"
+              class="cap-tag"
+            >
+              {{ token.label }}
             </el-tag>
           </template>
         </el-table-column>
@@ -190,13 +197,20 @@
             <el-option v-for="p in PROVIDER_OPTIONS" :key="p.value" :label="p.label" :value="p.value" />
           </el-select>
         </el-form-item>
-        <el-form-item label="用途" prop="modelType">
-          <el-select v-model="form.modelType" style="width: 100%">
-            <el-option v-for="t in MODEL_TYPE_OPTIONS" :key="t.value" :label="t.label" :value="t.value" />
-          </el-select>
+        <el-form-item label="能力" prop="capability">
+          <el-checkbox-group v-model="form.capability">
+            <el-checkbox
+              v-for="c in CAPABILITY_OPTIONS"
+              :key="c.value"
+              :value="c.value"
+              :label="c.label"
+              :disabled="c.required"
+            />
+          </el-checkbox-group>
           <div class="text-muted key-tip">
-            文本模型供对话/摘要/记忆抽取使用，视觉模型供看图描述与识别血糖使用。
-            同一用途同时只有一个默认模型——把视觉模型设为默认不会影响文本对话。
+            勾选这个模型能做什么，不是它属于哪个部门：含「视觉」的模型归视觉通道池，其余归文本通道池，
+            两个池各自维护一个默认模型（设视觉默认不会摘掉文本默认）。
+            「工具」表示支持 function calling，对话场景的技能调用依赖它。
           </div>
         </el-form-item>
         <el-form-item label="模型名(endpoint)" prop="modelEndpoint">
@@ -334,13 +348,38 @@ const PROVIDER_OPTIONS = [
 ]
 
 /**
- * 用途：文本 / 视觉。与「厂商（协议）」正交——同一厂商可以既有文本模型又有视觉模型。
- * 字段是批次 2 新增的，缺失按 TEXT 处理（历史行与旧页面都这样）。
+ * 能力集合：这个模型「能做什么」。与「厂商（协议）」正交——同一厂商可以既有文本又有视觉模型。
+ * text 是必选项（服务端也把空能力当 text），其余可勾选；vision 决定它归视觉池还是文本池。
  */
-const MODEL_TYPE_OPTIONS: Array<{ value: 'TEXT' | 'VISION'; label: string }> = [
-  { value: 'TEXT', label: '文本（对话 / 摘要 / 记忆）' },
-  { value: 'VISION', label: '视觉（看图描述 / 识别血糖）' }
+interface CapabilityOption {
+  value: string
+  label: string
+  required?: boolean
+}
+
+const CAPABILITY_OPTIONS: CapabilityOption[] = [
+  { value: 'text', label: '文本', required: true },
+  { value: 'tool', label: '工具调用' },
+  { value: 'stream', label: '流式' },
+  { value: 'vision', label: '视觉' }
 ]
+
+const CAPABILITY_LABEL: Record<string, string> = {
+  text: '文本',
+  tool: '工具',
+  stream: '流式',
+  vision: '视觉'
+}
+
+/** 把后端的 "text,tool,stream" 拆成表格里要渲染的标签；空值按「文本」处理。 */
+function capabilityTokens(raw?: string | null): Array<{ value: string; label: string }> {
+  const tokens = (raw || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+  if (tokens.length === 0) return [{ value: 'text', label: '文本' }]
+  return tokens.map((t) => ({ value: t, label: CAPABILITY_LABEL[t] || t }))
+}
 
 const TEST_CATEGORY_TEXT: Record<AiTestCategory, string> = {
   OK: '正常',
@@ -356,7 +395,7 @@ interface ModelForm {
   modelCode: string
   modelName: string
   providerCode: number
-  modelType: 'TEXT' | 'VISION'
+  capability: string[]
   apiBaseUrl: string
   modelEndpoint: string
   // el-input-number 的 modelValue 是 number | null，清空时回传 null，这里都留出 undefined 余量
@@ -393,7 +432,7 @@ function emptyForm(): ModelForm {
     modelCode: '',
     modelName: '',
     providerCode: 1,
-    modelType: 'TEXT',
+    capability: ['text', 'tool', 'stream'],
     apiBaseUrl: '',
     modelEndpoint: '',
     temperature: null,
@@ -431,12 +470,14 @@ const currentKeyText = computed(() => {
   return `${editing.value.apiKeyMasked || '未配置'}（${keySourceText(editing.value.apiKeySource)}）`
 })
 /**
- * 深度思考只对「DeepSeek 自研 + 文本用途」有意义：
+ * 深度思考只对「DeepSeek 自研 + 不带视觉能力」有意义：
  * 视觉通道走 OpenAI 兼容协议，请求里根本没有这个入参（后端启动时会 WARN 提示该行是死配置）。
  */
-const thinkingEnabled = computed(() => Number(form.providerCode) === 1 && form.modelType !== 'VISION')
+const thinkingEnabled = computed(
+  () => Number(form.providerCode) === 1 && !form.capability.includes('vision')
+)
 const thinkingHint = computed(() => {
-  if (form.modelType === 'VISION') return '视觉模型（OpenAI 兼容协议）没有这个入参，填了也不生效'
+  if (form.capability.includes('vision')) return '视觉模型（OpenAI 兼容协议）没有这个入参，填了也不生效'
   if (Number(form.providerCode) !== 1) return '仅厂商为 DeepSeek 自研时可开启'
   return '仅 DeepSeek 自研模型生效'
 })
@@ -502,8 +543,9 @@ function fillForm(row: AiModelRow) {
   form.modelCode = row.modelCode || ''
   form.modelName = row.modelName || ''
   form.providerCode = Number(row.providerCode) || 1
-  // 用途缺失的历史行按 TEXT 回填（与后端"NULL 视为文本"一致）：不回填会让用户一保存就改变语义
-  form.modelType = row.modelType === 'VISION' ? 'VISION' : 'TEXT'
+  // 能力缺失的历史行按「文本」回填（与后端"NULL 视为 text"一致）：不回填会让用户一保存就改变语义
+  form.capability = capabilityTokens(row.capability).map((t) => t.value)
+  if (!form.capability.includes('text')) form.capability.unshift('text')
   form.apiBaseUrl = row.apiBaseUrl || ''
   form.modelEndpoint = row.modelEndpoint || ''
   form.temperature = row.temperature ?? null
@@ -556,13 +598,13 @@ function buildPayload(): AiModelSavePayload {
   const payload: AiModelSavePayload = {
     modelName: form.modelName.trim(),
     providerCode: Number(form.providerCode),
-    modelType: form.modelType,
+    capability: form.capability.join(','),
     apiBaseUrl: blankToNull(form.apiBaseUrl),
     modelEndpoint: form.modelEndpoint.trim(),
     temperature: form.temperature ?? null,
     topP: form.topP ?? null,
     maxTokens: form.maxTokens ?? null,
-    // 深度思考只对「DeepSeek 自研 + 文本用途」有意义，其余显式置空，避免脏配置
+    // 深度思考只对「DeepSeek 自研 + 不带视觉能力」有意义，其余显式置空，避免脏配置
     thinking: thinkingEnabled.value ? form.thinking : null,
     timeoutMs: form.timeoutMs ?? null,
     isEnabled: form.enabled ? 1 : 0,
@@ -699,6 +741,7 @@ async function setDefaultRow(row: AiModelRow) {
 .filter { display: flex; justify-content: space-between; align-items: center; }
 .code-cell { display: flex; align-items: center; gap: 6px; }
 .key-cell { display: flex; align-items: center; gap: 6px; }
+.cap-tag { margin: 0 2px 2px 0; }
 .key-empty { color: var(--kt-muted); }
 .key-source { font-size: 11px; }
 .src-db { color: var(--kt-brand); }
