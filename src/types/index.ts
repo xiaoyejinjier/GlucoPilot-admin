@@ -338,6 +338,33 @@ export interface AiModelRow {
 }
 
 /** 列表接口附带的"当前生效情况"，用来解释"为什么用的是这个模型" */
+/** AI 用量报表的一行：某一天 × 某个模型。 */
+export interface AiUsageRow {
+  /** yyyy-MM-dd */
+  date: string
+  /** 模型编码；历史行没记模型时为「（未记录）」 */
+  modelCode: string
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+  calls: number
+}
+
+export interface AiUsageTotals {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+  calls: number
+}
+
+export interface AiUsageReport {
+  startDate: string
+  endDate: string
+  rows: AiUsageRow[]
+  totals: AiUsageTotals
+  /** 口径说明，前后端必须一致：只统计对话链路已落库的 token */
+  note: string
+}
 export interface AiModelListMeta {
   /** 当前文本对话实际使用的模型编码 */
   textDefaultCode: string
