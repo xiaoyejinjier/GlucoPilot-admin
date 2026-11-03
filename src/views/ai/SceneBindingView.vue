@@ -146,31 +146,40 @@
               class="full-select"
               clearable
               filterable
-              :disabled="!editing.modelCodeApplies"
-              :placeholder="editing.modelCodeApplies ? '留空 = 继承（走 yaml / 通道默认）' : '该场景不支持逐场景绑定模型'"
+              popper-class="model-select-popper"
+              placeholder="模型编码 · 名称 · 厂商　（留空 = 用该用途的默认模型）"
             >
               <el-option
                 v-for="m in selectableModels"
                 :key="m.code"
                 :label="modelLabel(m)"
                 :value="m.code"
-              />
+              >
+                <span class="opt-name">{{ m.name && m.name !== m.code ? m.name : m.code }}</span>
+                <span v-if="m.isDefault" class="opt-tag">默认模型</span>
+                <span class="opt-meta">
+                  名称 {{ m.name || '—' }}　编码 {{ m.code }}　厂商 {{ m.providerName || '—' }}　
+                  能力 {{ m.capabilityText || m.capability || '—' }}
+                </span>
+              </el-option>
               <el-option
                 v-for="m in unavailableModels"
                 :key="m.code"
-                :label="modelLabel(m) + '（能力不匹配，已隐藏）'"
+                :label="modelLabel(m)"
                 :value="m.code"
                 disabled
-              />
+              >
+                <span class="opt-name">{{ m.name && m.name !== m.code ? m.name : m.code }}</span>
+                <span class="opt-tag muted">能力不匹配</span>
+                <span class="opt-meta">
+                  名称 {{ m.name || '—' }}　编码 {{ m.code }}　厂商 {{ m.providerName || '—' }}　
+                  能力 {{ m.capabilityText || m.capability || '—' }}
+                </span>
+              </el-option>
             </el-select>
             <div class="text-muted field-tip">
-              <template v-if="editing.modelCodeApplies">
-                下拉只列能力匹配的模型（视觉场景要含 vision、文本场景要含 text）；后端保存时会再校验一次，
-                能力不匹配直接返回 400。
-              </template>
-              <template v-else>
-                模型编码固定不生效：视觉场景的模型由视觉通道统一解析，这一栏不可编辑。
-              </template>
+              下拉只列<strong>能力匹配</strong>的模型（视觉场景要含 vision、文本场景要含 text），后端保存时会再校验一次；
+              搜索支持编码与名称。
             </div>
           </el-form-item>
 
@@ -301,12 +310,14 @@ function thinkingText(value: boolean | null | undefined): string {
   return '继承'
 }
 
+/**
+ * 选中后输入框里显示的文字：名称 + 编码。
+ * 只写名称认不出绑定值（写库的是编码），只写编码认不出是哪个模型，两者都给。
+ * 厂商 / 能力不进这里——它们在展开的每一行里带字段名展示。
+ */
 function modelLabel(m: AiSceneModelOption): string {
-  const parts = [`${m.name || m.code}（${m.code}）`]
-  if (m.providerName) parts.push(m.providerName)
-  if (m.capabilityText) parts.push(m.capabilityText)
-  if (m.isDefault) parts.push('默认')
-  return parts.join(' · ')
+  if (!m.name || m.name === m.code) return m.code
+  return `${m.name}（${m.code}）`
 }
 
 /** 当前正在编辑的场景要的能力 token：视觉场景要 vision，文本场景要 text。 */
@@ -459,8 +470,24 @@ async function clearOverride(row: AiSceneRow) {
 .inline-tip { margin-left: 10px; font-size: 12px; }
 .field-tip { font-size: 12px; line-height: 1.5; margin-top: 4px; }
 .full-select { width: 100%; }
+/* 展开的每一行：名称（+标记）一行，下面一行逐字段标出「字段名 值」 */
+.opt-name { font-weight: 600; margin-right: 6px; }
+.opt-meta { display: block; font-size: 11px; color: var(--el-text-color-secondary); line-height: 18px; }
+.opt-tag { padding: 0 6px; font-size: 11px; line-height: 16px; border-radius: 4px;
+  color: var(--el-color-primary); background: var(--el-color-primary-light-9); }
+.opt-tag.muted { color: var(--el-text-color-secondary); background: var(--el-fill-color-light); }
 .mid-select { width: 200px; }
 
 .ref-box { width: 100%; padding: 10px 12px; background: #f7f8f8; border: 1px solid var(--kt-line); border-radius: 8px; }
 .ref-line { font-size: 12px; line-height: 1.8; }
+</style>
+
+<!-- 下拉面板被 teleport 到 body：两行内容需要放开固定行高 -->
+<style>
+.model-select-popper .el-select-dropdown__item {
+  height: auto;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  line-height: 1.4;
+}
 </style>
