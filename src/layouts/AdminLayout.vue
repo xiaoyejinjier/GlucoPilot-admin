@@ -124,6 +124,7 @@ const activePath = computed(() => route.path)
 function filterChildren(g: MenuGroup): MenuGroup {
   const role = auth.account?.role
   const children = g.children.filter((c) => {
+    if (c.adminOnly && role !== 'admin') return false
     if (!adminConfig.useMock) return !c.permission || auth.hasPermission(c.permission)
     return !c.roles || !role || c.roles.includes(role)
   })

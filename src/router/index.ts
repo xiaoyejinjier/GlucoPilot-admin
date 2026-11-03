@@ -11,6 +11,7 @@ declare module 'vue-router' {
     icon?: string
     roles?: Role[]
     permission?: string
+    adminOnly?: boolean
     hidden?: boolean
     placeholder?: string
     ruoyiResource?: string
@@ -48,6 +49,8 @@ export const routes: RouteRecordRaw[] = [
       { path: 'user-service/records', name: 'health-records', component: () => import('@/views/users/HealthRecordsView.vue'), meta: { title: '九时段记录', icon: 'TrendCharts', roles: ['admin'], permission: 'health:archive:view' } },
       { path: 'user-service/glucose-alerts', name: 'glucose-alerts', component: () => import('@/views/users/GlucoseAlertsView.vue'), meta: { title: '异常血糖事件', icon: 'Warning', roles: ['admin'], permission: 'health:alert:view' } },
       { path: 'feedback', name: 'feedback', component: () => import('@/views/users/FeedbackView.vue'), meta: { title: '反馈管理', icon: 'ChatLineSquare', roles: ['admin', 'editor'], permission: 'feedback:manage' } },
+      { path: 'user-service/messages', name: 'message-management', component: () => import('@/views/users/MessageManagementView.vue'), meta: { title: '信息管理', icon: 'ChatDotRound', roles: ['admin'], permission: 'user:manage', adminOnly: true } },
+      { path: 'user-service/recommendations', name: 'recommendation-management', component: () => import('@/views/users/RecommendationManagementView.vue'), meta: { title: '推荐管理', icon: 'DataAnalysis', roles: ['admin'], permission: 'user:manage', adminOnly: true } },
       { path: 'exports', name: 'exports', component: () => import('@/views/users/ExportView.vue'), meta: { title: '导出任务', icon: 'Download', roles: ['admin', 'editor'], permission: 'export:task:manage' } },
       { path: 'system/users', name: 'system-users', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '用户管理', icon: 'User', roles: ['admin'], permission: 'system:user:manage', ruoyiResource: 'users' } },
       { path: 'system/roles', name: 'roles', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '角色管理', icon: 'UserFilled', roles: ['admin'], permission: 'system:role:manage', ruoyiResource: 'roles' } },
@@ -83,6 +86,7 @@ export interface MenuChild {
   icon?: string
   roles?: Role[]
   permission?: string
+  adminOnly?: boolean
 }
 export interface MenuGroup {
   title: string
@@ -109,6 +113,8 @@ export const menuGroups: MenuGroup[] = [
     children: [
       { path: '/devices', title: '设备管理', icon: 'Cpu', roles: ['admin', 'editor'], permission: 'device:manage' },
       { path: '/feedback', title: '反馈管理', icon: 'ChatLineSquare', roles: ['admin', 'editor'], permission: 'feedback:manage' },
+      { path: '/user-service/messages', title: '信息管理', icon: 'ChatDotRound', roles: ['admin'], permission: 'user:manage', adminOnly: true },
+      { path: '/user-service/recommendations', title: '推荐管理', icon: 'DataAnalysis', roles: ['admin'], permission: 'user:manage', adminOnly: true },
       { path: '/exports', title: '导出任务', icon: 'Download', roles: ['admin', 'editor'], permission: 'export:task:manage' },
       { path: '/users', title: '用户管理', icon: 'User', roles: ['admin'], permission: 'user:manage' },
       { path: '/user-service/archives', title: '健康档案', icon: 'Files', roles: ['admin'], permission: 'health:archive:view' },
@@ -176,6 +182,7 @@ router.beforeEach((to) => {
     return { path: '/dashboard' }
   }
   const roles = to.meta.roles
+  if (to.meta.adminOnly && auth.role !== 'admin') return { path: '/dashboard' }
   if (adminConfig.useMock && roles && auth.account && !roles.includes(auth.account.role)) {
     return { path: '/dashboard' }
   }
