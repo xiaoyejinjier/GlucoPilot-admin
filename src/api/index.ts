@@ -659,7 +659,25 @@ export const aiUsageApi = {
     if (startDate) qs.set('startDate', startDate)
     if (endDate) qs.set('endDate', endDate)
     const suffix = qs.toString()
-    return get<AiUsageReport>(`/admin/v1/ai/usage${suffix ? `?${suffix}` : ''}`)
+    const raw = await get<AiUsageReport>(`/admin/v1/ai/usage${suffix ? `?${suffix}` : ''}`)
+    // 后端把 Long 序列化成字符串（避免 JS 精度丢失），这里统一转回数字：
+    // 否则表格里 toLocaleString 作用在字符串上，千分位不生效，排序与求和也是字符串语义。
+    return {
+      ...raw,
+      rows: (raw.rows || []).map((row) => ({
+        ...row,
+        promptTokens: Number(row.promptTokens ?? 0),
+        completionTokens: Number(row.completionTokens ?? 0),
+        totalTokens: Number(row.totalTokens ?? 0),
+        calls: Number(row.calls ?? 0)
+      })),
+      totals: {
+        promptTokens: Number(raw.totals?.promptTokens ?? 0),
+        completionTokens: Number(raw.totals?.completionTokens ?? 0),
+        totalTokens: Number(raw.totals?.totalTokens ?? 0),
+        calls: Number(raw.totals?.calls ?? 0)
+      }
+    }
   }
 }
 export const aiPromptApi = {
