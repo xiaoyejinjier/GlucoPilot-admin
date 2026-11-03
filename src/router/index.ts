@@ -73,6 +73,7 @@ export const routes: RouteRecordRaw[] = [
       { path: 'ai/model', name: 'ai-model', component: () => import('@/views/ai/ModelConfigView.vue'), meta: { title: '模型配置', icon: 'MagicStick', roles: ['admin'], permission: 'ai:model:query' } },
       { path: 'ai/prompt', name: 'ai-prompt', component: () => import('@/views/ai/PromptConfigView.vue'), meta: { title: '提示词管理', icon: 'EditPen', roles: ['admin'], permission: 'ai:prompt:list' } },
       { path: 'ai/scene', name: 'ai-scene', component: () => import('@/views/ai/SceneBindingView.vue'), meta: { title: '场景模型绑定', icon: 'Connection', roles: ['admin'], permission: 'ai:scene:list' } },
+      { path: 'ai/usage', name: 'ai-usage', component: () => import('@/views/ai/AiUsageView.vue'), meta: { title: 'AI 用量', icon: 'DataLine', roles: ['admin'], permission: 'ai:model:query' } },
       { path: 'message/push', name: 'push', component: () => import('@/views/placeholder/PlaceholderView.vue'), meta: { title: '消息推送', icon: 'Bell', roles: ['admin'], placeholder: '消息推送（二期）', permission: 'message:push:manage' } },
       { path: 'ai/config', name: 'ai-config', component: () => import('@/views/placeholder/PlaceholderView.vue'), meta: { title: 'AI 服务配置', icon: 'MagicStick', roles: ['admin'], placeholder: 'AI 服务配置（二期）', permission: 'ai:config:manage' } }
     ]
@@ -156,6 +157,7 @@ export const menuGroups: MenuGroup[] = [
       { path: '/ai/model', title: '模型配置', icon: 'MagicStick', permission: 'ai:model:query' },
       { path: '/ai/prompt', title: '提示词管理', icon: 'EditPen', permission: 'ai:prompt:list' },
       { path: '/ai/scene', title: '场景模型绑定', icon: 'Connection', permission: 'ai:scene:list' },
+      { path: '/ai/usage', title: 'AI 用量', icon: 'DataLine', permission: 'ai:model:query' },
       { path: '/ai/config', title: 'AI 服务配置', icon: 'Setting', permission: 'ai:config:manage' }
     ]
   },

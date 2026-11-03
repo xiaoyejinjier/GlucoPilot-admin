@@ -3,7 +3,7 @@ import type {
   AiModelListMeta, AiModelRow, AiModelSavePayload, AiModelTestResult,
   AiPromptSaveResult, AiPromptScene, AiPromptTemplateListData, AiPromptTemplateRow,
   AiPromptTemplateSavePayload, AiSceneListData, AiSceneListResult, AiSceneModelOption, AiSceneRow,
-  AiSceneSavePayload,
+  AiSceneSavePayload, AiUsageReport,
   AppUser, Banner, DeviceItem, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
   HealthArchive, MediaBizType, News, NineSlotResult, OpsAuditLogListData, OpsAuditLogPageResult,
   OpsAuditLogQuery, OpsAuditLogRawRow, OpsAuditLogRow, Role
@@ -648,6 +648,38 @@ function normalizePromptRow(row: AiPromptTemplateRow): AiPromptTemplateRow {
 }
 
 /** 提示词模板：只走真实后端（不参与 Mock 分支）。写操作要 ai:prompt:manage。 */
+export const aiUsageApi = {
+  /**
+   * 用量报表：区间为空时后端默认最近 7 天（上限 92 天）。
+   * 口径只有「天 × 模型」——chat_message 没有场景列，SUMMARY/MEMORY 等链路也没落 token。
+   */
+  async report(startDate?: string, endDate?: string): Promise<AiUsageReport> {
+    requireRemote()
+    const qs = new URLSearchParams()
+    if (startDate) qs.set('startDate', startDate)
+    if (endDate) qs.set('endDate', endDate)
+    const suffix = qs.toString()
+    const raw = await get<AiUsageReport>(`/admin/v1/ai/usage${suffix ? `?${suffix}` : ''}`)
+    // 后端把 Long 序列化成字符串（避免 JS 精度丢失），这里统一转回数字：
+    // 否则表格里 toLocaleString 作用在字符串上，千分位不生效，排序与求和也是字符串语义。
+    return {
+      ...raw,
+      rows: (raw.rows || []).map((row) => ({
+        ...row,
+        promptTokens: Number(row.promptTokens ?? 0),
+        completionTokens: Number(row.completionTokens ?? 0),
+        totalTokens: Number(row.totalTokens ?? 0),
+        calls: Number(row.calls ?? 0)
+      })),
+      totals: {
+        promptTokens: Number(raw.totals?.promptTokens ?? 0),
+        completionTokens: Number(raw.totals?.completionTokens ?? 0),
+        totalTokens: Number(raw.totals?.totalTokens ?? 0),
+        calls: Number(raw.totals?.calls ?? 0)
+      }
+    }
+  }
+}
 export const aiPromptApi = {
   /** sceneCode / status 都可空；不改动 filters 时后端返回全部场景与全部版本。 */
   async list(params: { sceneCode?: string; status?: number | null } = {}): Promise<AiPromptListResult> {
