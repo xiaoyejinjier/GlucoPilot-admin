@@ -1,5 +1,11 @@
 # 拆仓工作记录
 
+## 2026-11-04 GitHub main 同步
+
+- 保留信息管理、推荐管理、菜单和权限控制，合入远端3个AI用量报表及场景选择说明提交。
+- 合并后58项Node测试、vue-tsc类型检查和Vite生产构建全部通过；日志在工作区.tmp/github-upload-admin-tests.log、.tmp/github-upload-admin-build.log。
+- 按管理端独立仓库同步main，保留本地环境配置。
+
 ## 2026-11-02 同步远端并保留信息与推荐管理
 
 - 合入main的9个远端提交（f14ad3c），保留本地信息管理、推荐管理、菜单和访问权限。
