@@ -735,3 +735,33 @@ export interface AiChatMessageDetail {
   finishReason: number | null
   createdAt: string | null
 }
+
+/**
+ * 一个上下文分片（`chat_context` 的一行元数据）。
+ * 只有类型、键、估算 token、顺序——正文与摘要不在这里，分别落在 chat_message 与 chat_session。
+ */
+export interface AiChatContextShard {
+  /** 1 系统提示 3 历史摘要 5 工具结果 6 其他（与后端 ChatContextEntity.contextType 一致） */
+  contextType: number | null
+  /** system_prompt / long_term_memory / context_summary / tool_digest / history_messages */
+  contextKey: string | null
+  tokenEstimate: number | null
+  sortNo: number | null
+}
+
+/** 一轮 prompt 的分片组成。token 是装配期估算，不是厂商返回的 usage。 */
+export interface AiChatContextRound {
+  contextRound: number
+  triggerMsgId: number | null
+  assistantMsgId: number | null
+  modelCode: string | null
+  totalTokens: number
+  shards: AiChatContextShard[]
+}
+
+/** 一个会话的分片审计（GET /admin/v1/ai/chat-sessions/{id}/context）。 */
+export interface AiChatContextView {
+  sessionId: number
+  rounds: AiChatContextRound[]
+  totalTokens: number
+}

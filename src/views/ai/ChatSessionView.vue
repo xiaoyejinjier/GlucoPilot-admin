@@ -123,6 +123,51 @@
           <span>分片轮次 {{ current.contextRounds }}</span>
         </div>
 
+        <div class="context-block">
+          <div class="context-head">
+            <span class="context-title">上下文构成</span>
+            <span class="text-muted">
+              <template v-if="contextView">
+                共 {{ contextView.rounds.length }} 轮 · 合计 {{ contextView.totalTokens }} token（装配期估算）
+              </template>
+              <template v-else>每轮 prompt 由哪些分片拼成、各占多少 token</template>
+            </span>
+            <el-button link type="primary" @click="toggleContext">{{ contextOpen ? '收起' : '展开' }}</el-button>
+          </div>
+          <div v-if="contextOpen" v-loading="contextLoading" class="context-body">
+            <p class="context-hint text-muted">
+              只记元数据、不存正文；token 是装配期估算，不是厂商返回的 usage。展开这里不会留下审计记录。
+            </p>
+            <div v-for="round in contextView?.rounds || []" :key="round.contextRound" class="context-round">
+              <div class="context-round-head">
+                <span>第 {{ round.contextRound }} 轮</span>
+                <span class="text-muted">{{ round.modelCode || '—' }} · {{ round.totalTokens }} token</span>
+                <span v-if="round.triggerMsgId" class="text-muted">触发 #{{ round.triggerMsgId }}</span>
+              </div>
+              <div v-if="round.shards.length" class="shard-bar">
+                <span
+                  v-for="(shard, sIdx) in round.shards"
+                  :key="`bar-${round.contextRound}-${sIdx}`"
+                  class="shard-seg"
+                  :class="`seg-${shard.contextType ?? 0}`"
+                  :style="{ flex: shardFlex(shard) }"
+                  :title="`${shardLabel(shard)} ${shard.tokenEstimate ?? 0} token`"
+                />
+              </div>
+              <div v-if="round.shards.length" class="shard-legend">
+                <span v-for="(shard, sIdx) in round.shards" :key="`legend-${round.contextRound}-${sIdx}`">
+                  <i class="shard-dot" :class="`seg-${shard.contextType ?? 0}`" />
+                  {{ shardLabel(shard) }} {{ shard.tokenEstimate ?? 0 }}
+                </span>
+              </div>
+              <div v-else class="text-muted context-hint">这一轮没有分片记录</div>
+            </div>
+            <div v-if="!contextLoading && !(contextView?.rounds?.length)" class="text-muted context-hint">
+              该会话没有分片记录（v1 之前的会话，或这一轮还没跑完）
+            </div>
+          </div>
+        </div>
+
         <el-alert
           type="info"
           :closable="false"
@@ -193,7 +238,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { aiChatAuditApi } from '@/api'
-import type { AiChatMessageDetail, AiChatMessageRow, AiChatSessionRow } from '@/types'
+import type { AiChatContextShard, AiChatContextView, AiChatMessageDetail, AiChatMessageRow, AiChatSessionRow } from '@/types'
 import { fmtTime } from '@/utils/format'
 
 const SESSION_STATUS: Record<number, string> = { 0: '归档', 1: '进行中', 2: '已结束' }
@@ -223,6 +268,12 @@ const detailLoading = ref<number | null>(null)
  * 来回切换分页时用缓存，避免同一条消息被读两次留下两条重复审计。
  */
 const detailCache = reactive<Record<number, AiChatMessageDetail | null>>({})
+
+/** 上下文构成：默认收起。展开才请求，且只在第一次展开时请求一次（元数据不写审计，重读也无副作用）。 */
+const contextOpen = ref(false)
+const contextLoading = ref(false)
+const contextView = ref<AiChatContextView | null>(null)
+
 
 const drawerTitle = computed(() => (current.value ? `会话 #${current.value.id} ${current.value.title || ''}` : '会话消息'))
 
@@ -273,9 +324,53 @@ function resetMessages() {
   Object.keys(detailCache).forEach((key) => delete detailCache[Number(key)])
 }
 
+function resetContext() {
+  contextOpen.value = false
+  contextLoading.value = false
+  contextView.value = null
+}
+
 function resetDrawer() {
   current.value = null
   resetMessages()
+  resetContext()
+}
+
+async function toggleContext() {
+  contextOpen.value = !contextOpen.value
+  // 收起时不请求；已加载过就不再重复拉（同一会话的分片在一次抽屉生命周期内不会变）
+  if (!contextOpen.value || contextView.value || !current.value) return
+  contextLoading.value = true
+  try {
+    contextView.value = await aiChatAuditApi.context(current.value.id)
+  } catch (e) {
+    ElMessage.error((e as Error)?.message || '上下文构成加载失败')
+  } finally {
+    contextLoading.value = false
+  }
+}
+
+/** 分片占比用 flex 权重表达，省掉百分比舍入，累计永远刚好铺满一条。 */
+function shardFlex(shard: AiChatContextShard): string {
+  const tokens = shard.tokenEstimate ?? 0
+  return String(tokens > 0 ? tokens : 1)
+}
+
+const SHARD_TEXT: Record<string, string> = {
+  system_prompt: '系统提示词',
+  long_term_memory: '长期记忆',
+  context_summary: '滚动摘要',
+  tool_digest: '工具摘要',
+  history_messages: '历史消息'
+}
+
+const TYPE_TEXT_SHARD: Record<number, string> = { 1: '系统提示', 3: '历史摘要', 5: '工具结果', 6: '其他' }
+
+function shardLabel(shard: AiChatContextShard): string {
+  if (shard.contextKey && SHARD_TEXT[shard.contextKey]) return SHARD_TEXT[shard.contextKey]
+  if (shard.contextKey) return shard.contextKey
+  const type = shard.contextType
+  return type != null && TYPE_TEXT_SHARD[type] ? TYPE_TEXT_SHARD[type] : '分片'
 }
 
 async function loadMessages(page = msgPageNum.value) {
@@ -376,6 +471,91 @@ function fullText(detail: AiChatMessageDetail): string {
   gap: 16px;
   font-size: 13px;
   color: var(--el-text-color-secondary);
+}
+.context-block {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.context-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.context-title {
+  font-weight: 600;
+}
+.context-head .el-button {
+  margin-left: auto;
+}
+.context-body {
+  margin-top: 8px;
+  max-height: 260px;
+  overflow: auto;
+}
+.context-hint {
+  margin: 4px 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.context-round {
+  padding: 8px 0;
+  border-top: 1px dashed var(--el-border-color-lighter);
+}
+.context-round:first-of-type {
+  border-top: none;
+}
+.context-round-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  font-size: 12px;
+}
+.shard-bar {
+  display: flex;
+  height: 12px;
+  margin: 6px 0 4px;
+  border-radius: 6px;
+  /* 与卡片同色的细边框，避免相邻同色分片看不出接缝 */
+  overflow: hidden;
+}
+
+.shard-bar .shard-seg + .shard-seg {
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.55);
+}
+.shard-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.shard-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+/* 分片配色按 contextType 区分，legend 与进度条共用 */
+.seg-1 {
+  background: #409eff;
+}
+.seg-3 {
+  background: #b88230;
+}
+.seg-5 {
+  background: #67c23a;
+}
+.seg-6 {
+  background: #909399;
+}
+.seg-0 {
+  background: #c8c9cc;
 }
 .msg-list {
   flex: 1;

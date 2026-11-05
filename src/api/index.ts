@@ -4,6 +4,7 @@ import type {
   AiPromptSaveResult, AiPromptScene, AiPromptTemplateListData, AiPromptTemplateRow,
   AiPromptTemplateSavePayload, AiSceneListData, AiSceneListResult, AiSceneModelOption, AiSceneRow,
   AiSceneSavePayload, AiUsageReport, AiChatSessionRow, AiChatMessageRow, AiChatMessageDetail,
+  AiChatContextView,
   AppUser, Banner, DeviceItem, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
   HealthArchive, MediaBizType, News, NineSlotResult, OpsAuditLogListData, OpsAuditLogPageResult,
   OpsAuditLogQuery, OpsAuditLogRawRow, OpsAuditLogRow, Role
@@ -926,6 +927,17 @@ export const aiChatAuditApi = {
   async messageDetail(sessionId: number, messageId: number): Promise<AiChatMessageDetail> {
     requireRemote()
     return await get<AiChatMessageDetail>(`/admin/v1/ai/chat-sessions/${sessionId}/messages/${messageId}`)
+  },
+
+  /**
+   * 会话的上下文分片（每轮 prompt 由哪些分片拼成、各占多少 token）。
+   * 只有元数据、没有正文，因此不写审计——展开这个区块不算「查看用户内容」。
+   * 不传 round 时返回全部轮次。
+   */
+  async context(sessionId: number, round?: number): Promise<AiChatContextView> {
+    requireRemote()
+    const qs = queryString({ round })
+    return await get<AiChatContextView>(`/admin/v1/ai/chat-sessions/${sessionId}/context${qs ? `?${qs}` : ''}`)
   }
 }
 export { resetDb } from '@/mock'
