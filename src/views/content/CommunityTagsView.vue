@@ -39,7 +39,7 @@ import {ElMessage,ElMessageBox} from 'element-plus'
 import {communityTagsApi,type ManagedTag,type TagChange} from '@/api/community-tags'
 import {useAuthStore} from '@/stores/auth'
 import {getAccessToken} from '@/utils/request'
-const auth=useAuthStore(),canManage=computed(()=>auth.role==='admin'&&auth.hasPermission('content:news:edit'))
+const auth=useAuthStore(),canManage=computed(()=>auth.hasPermission('content:news:edit'))
 const query=reactive({keyword:'',type:'',enabled:''}),rows=ref<ManagedTag[]>([]),pageNum=ref(1),total=ref(0),loading=ref(false),error=ref('')
 const editorOpen=ref(false),editing=ref<ManagedTag|null>(null),form=reactive<TagChange>({name:'',sortNo:10,enabled:1}),editorError=ref(''),saving=ref(false)
 let alive=true,run=0,applied={...query}

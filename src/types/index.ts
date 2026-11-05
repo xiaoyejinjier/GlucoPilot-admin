@@ -670,3 +670,68 @@ export interface DashboardStats {
   channelDist: Array<{ channel: string; value: number }>
   nodeHeat: Array<{ node: string; value: number }>
 }
+
+/* ---- AI 会话审计（V53 权限点 ai:chat:audit，接口 /admin/v1/ai/chat-sessions） ---- */
+
+/** 会话列表的一行：只有元数据，不含任何消息正文。 */
+export interface AiChatSessionRow {
+  id: number
+  userId: number
+  /** 用户昵称（user_profile.nickname）；用户没填过则为 null */
+  userNickname: string | null
+  title: string | null
+  /** 0 归档 1 进行中 2 已结束 */
+  sessionStatus: number
+  /** 1 纯文字 2 纯语音 3 混合 */
+  sessionType: number
+  modelCode: string | null
+  systemPromptVer: string | null
+  msgCount: number
+  /** 该会话在 chat_context 里记了几轮分片；0 = 没有可查的 token 构成 */
+  contextRounds: number
+  /** 是否已有滚动摘要（后端把 MEDIUMTEXT 折成布尔，不返回摘要原文） */
+  hasSummary: boolean
+  lastMsgAt: string | null
+  createdAt: string | null
+}
+
+/** 消息预览：正文只给前 200 字，看全文必须再请求一次（那一次会在后端写审计）。 */
+export interface AiChatMessageRow {
+  id: number
+  seqNo: number
+  /** 1 用户 2 助手 3 系统 */
+  msgRole: number
+  /** 1 文本 2 图片 3 语音 */
+  msgType: number
+  preview: string
+  modelCode: string | null
+  promptTokens: number | null
+  completionTokens: number | null
+  latencyMs: number | null
+  /** 0 正常 1 长度截断 2 内容过滤 3 工具调用 4 错误（与后端 ChatMessage.finishReason 一致） */
+  finishReason: number | null
+  createdAt: string | null
+}
+
+/** 单条消息全文。 */
+export interface AiChatMessageDetail {
+  id: number
+  sessionId: number
+  userId: number
+  seqNo: number
+  msgRole: number
+  msgType: number
+  contentText: string | null
+  mediaCaption: string | null
+  asrText: string | null
+  mediaId: number | null
+  voiceMediaId: number | null
+  voiceDurationMs: number | null
+  replyToMsgId: number | null
+  modelCode: string | null
+  promptTokens: number | null
+  completionTokens: number | null
+  latencyMs: number | null
+  finishReason: number | null
+  createdAt: string | null
+}

@@ -89,7 +89,7 @@ import ArticlePhoto from './ArticlePhoto.vue'
 
 const route = useRoute(), router = useRouter(), auth = useAuthStore()
 const reportMode = computed(() => route.path.endsWith('community-reports'))
-const canReview = computed(() => auth.role === 'admin' && auth.hasPermission('content:news:edit'))
+const canReview = computed(() => auth.hasPermission('content:news:edit'))
 const canEdit = computed(() => auth.hasPermission('content:news:edit'))
 const stateNames: Record<string,string> = { DRAFT:'草稿', AI_PENDING:'等待初审', AI_REVIEWING:'AI 初审中', PENDING_ADMIN:'待管理员终审', AI_REJECTED:'初审未通过', AI_ERROR:'初审异常', PUBLISHED:'已发布', REJECTED:'已驳回', HIDDEN:'已下架' }
 const reportStates: Record<string,string> = { OPEN:'待处理', DISMISSED:'不成立', RESOLVED:'已处理' }

@@ -96,7 +96,7 @@ import { getAccessToken } from '@/utils/request'
 
 const router = useRouter()
 const auth = useAuthStore()
-const canManage = computed(() => auth.role === 'admin' && auth.hasPermission('content:news:edit'))
+const canManage = computed(() => auth.hasPermission('content:news:edit'))
 
 const query = reactive({ status: '', verdict: '', hidden: '', keyword: '' })
 const applied = reactive({ ...query })

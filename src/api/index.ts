@@ -3,7 +3,7 @@ import type {
   AiModelListMeta, AiModelRow, AiModelSavePayload, AiModelTestResult,
   AiPromptSaveResult, AiPromptScene, AiPromptTemplateListData, AiPromptTemplateRow,
   AiPromptTemplateSavePayload, AiSceneListData, AiSceneListResult, AiSceneModelOption, AiSceneRow,
-  AiSceneSavePayload, AiUsageReport,
+  AiSceneSavePayload, AiUsageReport, AiChatSessionRow, AiChatMessageRow, AiChatMessageDetail,
   AppUser, Banner, DeviceItem, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
   HealthArchive, MediaBizType, News, NineSlotResult, OpsAuditLogListData, OpsAuditLogPageResult,
   OpsAuditLogQuery, OpsAuditLogRawRow, OpsAuditLogRow, Role
@@ -893,4 +893,39 @@ export const opsAuditApi = {
   }
 }
 
+/**
+ * AI 会话审计：只读三接口。
+ *
+ * 拆成「列表 / 预览 / 全文」三级是后端的有意设计：列表与预览不写审计，
+ * 只有读全文会留一条 ops_audit_log（ai_chat_audit_view）。所以页面必须
+ * 让「展开原文」成为一次显式点击，不能打开抽屉时批量预取全文。
+ */
+export const aiChatAuditApi = {
+  async list(params: { userId?: number; status?: number; keyword?: string; pageNum?: number; pageSize?: number } = {}) {
+    requireRemote()
+    const qs = queryString({
+      userId: params.userId,
+      status: params.status,
+      keyword: params.keyword,
+      pageNum: params.pageNum,
+      pageSize: params.pageSize
+    })
+    const data = await get<PageData<AiChatSessionRow>>(`/admin/v1/ai/chat-sessions${qs ? `?${qs}` : ''}`)
+    return { records: (data?.records || []).map(numId), total: pageTotal(data?.total) }
+  },
+
+  async messages(sessionId: number, params: { beforeSeq?: number; pageNum?: number; pageSize?: number } = {}) {
+    requireRemote()
+    const qs = queryString({ beforeSeq: params.beforeSeq, pageNum: params.pageNum, pageSize: params.pageSize })
+    const data = await get<PageData<AiChatMessageRow>>(
+      `/admin/v1/ai/chat-sessions/${sessionId}/messages${qs ? `?${qs}` : ''}`
+    )
+    return { records: (data?.records || []).map(numId), total: pageTotal(data?.total) }
+  },
+
+  async messageDetail(sessionId: number, messageId: number): Promise<AiChatMessageDetail> {
+    requireRemote()
+    return await get<AiChatMessageDetail>(`/admin/v1/ai/chat-sessions/${sessionId}/messages/${messageId}`)
+  }
+}
 export { resetDb } from '@/mock'
