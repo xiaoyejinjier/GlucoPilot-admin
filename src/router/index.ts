@@ -74,7 +74,7 @@ export const routes: RouteRecordRaw[] = [
       { path: 'ai/prompt', name: 'ai-prompt', component: () => import('@/views/ai/PromptConfigView.vue'), meta: { title: '提示词管理', icon: 'EditPen', roles: ['admin'], permission: 'ai:prompt:list' } },
       { path: 'ai/scene', name: 'ai-scene', component: () => import('@/views/ai/SceneBindingView.vue'), meta: { title: '场景模型绑定', icon: 'Connection', roles: ['admin'], permission: 'ai:scene:list' } },
       { path: 'ai/usage', name: 'ai-usage', component: () => import('@/views/ai/AiUsageView.vue'), meta: { title: 'AI 用量', icon: 'DataLine', roles: ['admin'], permission: 'ai:usage:view' } },
-      { path: 'ai/chat-sessions', name: 'ai-chat-sessions', component: () => import('@/views/ai/ChatSessionView.vue'), meta: { title: 'AI 会话审计', icon: 'ChatDotSquare', roles: ['admin'], permission: 'ai:chat:audit' } },
+      { path: 'ai/audit', name: 'ai-audit', component: () => import('@/views/ai/AiAuditView.vue'), meta: { title: 'AI 审计', icon: 'DocumentChecked', roles: ['admin'], permission: 'ai:chat:audit' } },
       { path: 'message/push', name: 'push', component: () => import('@/views/placeholder/PlaceholderView.vue'), meta: { title: '消息推送', icon: 'Bell', roles: ['admin'], placeholder: '消息推送（二期）', permission: 'message:push:manage' } },
       { path: 'ai/config', name: 'ai-config', component: () => import('@/views/placeholder/PlaceholderView.vue'), meta: { title: 'AI 服务配置', icon: 'MagicStick', roles: ['admin'], placeholder: 'AI 服务配置（二期）', permission: 'ai:config:manage' } }
     ]
@@ -159,7 +159,7 @@ export const menuGroups: MenuGroup[] = [
       { path: '/ai/prompt', title: '提示词管理', icon: 'EditPen', permission: 'ai:prompt:list' },
       { path: '/ai/scene', title: '场景模型绑定', icon: 'Connection', permission: 'ai:scene:list' },
       { path: '/ai/usage', title: 'AI 用量', icon: 'DataLine', permission: 'ai:usage:view' },
-      { path: '/ai/chat-sessions', title: 'AI 会话审计', icon: 'ChatDotSquare', permission: 'ai:chat:audit' },
+      { path: '/ai/audit', title: 'AI 审计', icon: 'DocumentChecked', permission: 'ai:chat:audit' },
       { path: '/ai/config', title: 'AI 服务配置', icon: 'Setting', permission: 'ai:config:manage' }
     ]
   },

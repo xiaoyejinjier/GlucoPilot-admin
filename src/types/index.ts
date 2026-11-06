@@ -765,3 +765,101 @@ export interface AiChatContextView {
   rounds: AiChatContextRound[]
   totalTokens: number
 }
+
+/**
+ * 工具调用审计行（GET /admin/v1/ai/audit/tool-calls）。
+ * `resultDigest` 是 ≤512 字的返回摘要——工具的真实返回内容不在库里（V21 的设计）。
+ */
+export interface AiAuditToolCallRow {
+  id: number
+  sessionId: number
+  userId: number
+  userMsgId: number | null
+  toolName: string
+  callIndex: number
+  ok: boolean
+  durationMs: number | null
+  /** 异常类名（如 BusyRetryException），成功时为 null */
+  errorType: string | null
+  resultDigest: string | null
+  createdAt: string | null
+}
+
+/** 长期记忆审计行（GET /admin/v1/ai/audit/memories）。 */
+export interface AiAuditMemoryRow {
+  id: number
+  userId: number
+  memoryKey: string
+  memoryText: string
+  sourceSessionId: number | null
+  /** 0~100 */
+  confidence: number
+  /** 逻辑删除标记；只有 includeDeleted=1 的查询才会出现已删行 */
+  deleted: boolean
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+/** 滚动摘要审计行（GET /admin/v1/ai/audit/summaries）。 */
+export interface AiAuditSummaryRow {
+  sessionId: number
+  userId: number
+  title: string
+  msgCount: number
+  summaryUptoMsgId: number | null
+  summaryChars: number
+  summary: string | null
+  summaryUpdatedAt: string | null
+}
+
+/** 多模态识别任务审计行（GET /admin/v1/ai/audit/ocr-tasks）。 */
+export interface AiAuditOcrTaskRow {
+  id: number
+  userId: number
+  mediaId: number
+  /** 1 血糖 2 餐食 */
+  bizType: number
+  /** 0 待处理 1 进行中 2 成功 3 失败 */
+  taskStatus: number
+  /** = finished_at - gmt_create，未完成时为 null */
+  durationMs: number | null
+  errorMsg: string | null
+  resultChars: number
+  resultPreview: string | null
+  createdAt: string | null
+  finishedAt: string | null
+}
+
+/** 社区审核命中审计行（GET /admin/v1/community/moderation-hits）。 */
+export interface ModerationHitAuditRow {
+  id: number
+  targetType: string
+  targetId: number
+  revision: number | null
+  categoryCode: string
+  /** 1 低 2 中 3 高 */
+  severity: number
+  confidence: number | null
+  startOffset: number | null
+  endOffset: number | null
+  snippetLen: number | null
+  /** 命中片段 sha256（不存原文） */
+  snippetHash: string | null
+  reason: string
+  modelCode: string
+  promptVer: string | null
+  createdAt: string | null
+}
+
+/** 翻译缓存审计行（GET /admin/v1/localizations/audit）。 */
+export interface LocalizationAuditRow {
+  kind: string
+  resourceId: string
+  sourceHash: string
+  locale: string
+  status: string
+  promptVer: string | null
+  translatedChars: number
+  translatedPreview: string | null
+  updatedAt: string | null
+}

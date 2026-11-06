@@ -4,7 +4,8 @@ import type {
   AiPromptSaveResult, AiPromptScene, AiPromptTemplateListData, AiPromptTemplateRow,
   AiPromptTemplateSavePayload, AiSceneListData, AiSceneListResult, AiSceneModelOption, AiSceneRow,
   AiSceneSavePayload, AiUsageReport, AiChatSessionRow, AiChatMessageRow, AiChatMessageDetail,
-  AiChatContextView,
+  AiChatContextView, AiAuditToolCallRow, AiAuditMemoryRow, AiAuditSummaryRow, AiAuditOcrTaskRow,
+ModerationHitAuditRow, LocalizationAuditRow,
   AppUser, Banner, DeviceItem, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
   HealthArchive, MediaBizType, News, NineSlotResult, OpsAuditLogListData, OpsAuditLogPageResult,
   OpsAuditLogQuery, OpsAuditLogRawRow, OpsAuditLogRow, Role
@@ -938,6 +939,114 @@ export const aiChatAuditApi = {
     requireRemote()
     const qs = queryString({ round })
     return await get<AiChatContextView>(`/admin/v1/ai/chat-sessions/${sessionId}/context${qs ? `?${qs}` : ''}`)
+  }
+}
+
+/**
+ * AI 审计的四张只读列表（工具调用 / 长期记忆 / 滚动摘要 / 多模态任务）。
+ *
+ * 会话列表与消息仍走 `aiChatAuditApi`：那三支接口有「读正文要留痕」的两段式语义，
+ * 与这里的「一眼看完」不是同一类，刻意不合并。
+ */
+export const aiAuditApi = {
+  async toolCalls(
+    params: { userId?: number; sessionId?: number; toolName?: string; ok?: boolean; pageNum?: number; pageSize?: number } = {}
+  ) {
+    requireRemote()
+    const qs = queryString({
+      userId: params.userId,
+      sessionId: params.sessionId,
+      toolName: params.toolName,
+      ok: params.ok,
+      pageNum: params.pageNum,
+      pageSize: params.pageSize
+    })
+    const data = await get<PageData<AiAuditToolCallRow>>(`/admin/v1/ai/audit/tool-calls${qs ? `?${qs}` : ''}`)
+    return { records: (data?.records || []).map(numId), total: pageTotal(data?.total) }
+  },
+
+  async memories(
+    params: {
+      userId?: number
+      memoryKey?: string
+      keyword?: string
+      includeDeleted?: boolean
+      pageNum?: number
+      pageSize?: number
+    } = {}
+  ) {
+    requireRemote()
+    const qs = queryString({
+      userId: params.userId,
+      memoryKey: params.memoryKey,
+      keyword: params.keyword,
+      includeDeleted: params.includeDeleted,
+      pageNum: params.pageNum,
+      pageSize: params.pageSize
+    })
+    const data = await get<PageData<AiAuditMemoryRow>>(`/admin/v1/ai/audit/memories${qs ? `?${qs}` : ''}`)
+    return { records: (data?.records || []).map(numId), total: pageTotal(data?.total) }
+  },
+
+  async summaries(params: { userId?: number; keyword?: string; pageNum?: number; pageSize?: number } = {}) {
+    requireRemote()
+    const qs = queryString({
+      userId: params.userId,
+      keyword: params.keyword,
+      pageNum: params.pageNum,
+      pageSize: params.pageSize
+    })
+    const data = await get<PageData<AiAuditSummaryRow>>(`/admin/v1/ai/audit/summaries${qs ? `?${qs}` : ''}`)
+    return { records: (data?.records || []).map((row) => row), total: pageTotal(data?.total) }
+  },
+
+  async ocrTasks(
+    params: { userId?: number; bizType?: number; taskStatus?: number; pageNum?: number; pageSize?: number } = {}
+  ) {
+    requireRemote()
+    const qs = queryString({
+      userId: params.userId,
+      bizType: params.bizType,
+      taskStatus: params.taskStatus,
+      pageNum: params.pageNum,
+      pageSize: params.pageSize
+    })
+    const data = await get<PageData<AiAuditOcrTaskRow>>(`/admin/v1/ai/audit/ocr-tasks${qs ? `?${qs}` : ''}`)
+    return { records: (data?.records || []).map(numId), total: pageTotal(data?.total) }
+  }
+}
+
+/** 社区审核命中明细（AI 审计的「内容审核」页签）。 */
+export const moderationHitAuditApi = {
+  async list(
+    params: { targetType?: string; categoryCode?: string; severity?: number; pageNum?: number; pageSize?: number } = {}
+  ) {
+    requireRemote()
+    const qs = queryString({
+      targetType: params.targetType,
+      categoryCode: params.categoryCode,
+      severity: params.severity,
+      pageNum: params.pageNum,
+      pageSize: params.pageSize
+    })
+    const data = await get<PageData<ModerationHitAuditRow>>(`/admin/v1/community/moderation-hits${qs ? `?${qs}` : ''}`)
+    return { records: (data?.records || []).map(numId), total: pageTotal(data?.total) }
+  }
+}
+
+/** 中英翻译缓存审计（AI 审计的「翻译」页签）。 */
+export const localizationAuditApi = {
+  async list(params: { kind?: string; status?: string; pageNum?: number; pageSize?: number } = {}) {
+    requireRemote()
+    const qs = queryString({
+      kind: params.kind,
+      status: params.status,
+      pageNum: params.pageNum,
+      pageSize: params.pageSize
+    })
+    const data = await get<PageData<LocalizationAuditRow>>(`/admin/v1/localizations/audit${qs ? `?${qs}` : ''}`)
+    // 翻译表主键是四列组合（kind + resourceId + sourceHash + locale），没有 id
+    return { records: data?.records || [], total: pageTotal(data?.total) }
   }
 }
 export { resetDb } from '@/mock'
