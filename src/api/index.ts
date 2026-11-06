@@ -912,7 +912,7 @@ export const aiChatAuditApi = {
       pageNum: params.pageNum,
       pageSize: params.pageSize
     })
-    const data = await get<PageData<AiChatSessionRow>>(`/admin/v1/ai/chat-sessions${qs ? `?${qs}` : ''}`)
+    const data = await get<PageData<AiChatSessionRow>>(`/admin/v1/ai/audit/sessions${qs ? `?${qs}` : ''}`)
     return { records: (data?.records || []).map(numId), total: pageTotal(data?.total) }
   },
 
@@ -920,14 +920,14 @@ export const aiChatAuditApi = {
     requireRemote()
     const qs = queryString({ beforeSeq: params.beforeSeq, pageNum: params.pageNum, pageSize: params.pageSize })
     const data = await get<PageData<AiChatMessageRow>>(
-      `/admin/v1/ai/chat-sessions/${sessionId}/messages${qs ? `?${qs}` : ''}`
+      `/admin/v1/ai/audit/sessions/${sessionId}/messages${qs ? `?${qs}` : ''}`
     )
     return { records: (data?.records || []).map(numId), total: pageTotal(data?.total) }
   },
 
   async messageDetail(sessionId: number, messageId: number): Promise<AiChatMessageDetail> {
     requireRemote()
-    return await get<AiChatMessageDetail>(`/admin/v1/ai/chat-sessions/${sessionId}/messages/${messageId}`)
+    return await get<AiChatMessageDetail>(`/admin/v1/ai/audit/sessions/${sessionId}/messages/${messageId}`)
   },
 
   /**
@@ -938,7 +938,7 @@ export const aiChatAuditApi = {
   async context(sessionId: number, round?: number): Promise<AiChatContextView> {
     requireRemote()
     const qs = queryString({ round })
-    return await get<AiChatContextView>(`/admin/v1/ai/chat-sessions/${sessionId}/context${qs ? `?${qs}` : ''}`)
+    return await get<AiChatContextView>(`/admin/v1/ai/audit/sessions/${sessionId}/context${qs ? `?${qs}` : ''}`)
   }
 }
 
@@ -1029,7 +1029,7 @@ export const moderationHitAuditApi = {
       pageNum: params.pageNum,
       pageSize: params.pageSize
     })
-    const data = await get<PageData<ModerationHitAuditRow>>(`/admin/v1/community/moderation-hits${qs ? `?${qs}` : ''}`)
+    const data = await get<PageData<ModerationHitAuditRow>>(`/admin/v1/ai/audit/moderation-hits${qs ? `?${qs}` : ''}`)
     return { records: (data?.records || []).map(numId), total: pageTotal(data?.total) }
   }
 }
@@ -1044,7 +1044,7 @@ export const localizationAuditApi = {
       pageNum: params.pageNum,
       pageSize: params.pageSize
     })
-    const data = await get<PageData<LocalizationAuditRow>>(`/admin/v1/localizations/audit${qs ? `?${qs}` : ''}`)
+    const data = await get<PageData<LocalizationAuditRow>>(`/admin/v1/ai/audit/translations${qs ? `?${qs}` : ''}`)
     // 翻译表主键是四列组合（kind + resourceId + sourceHash + locale），没有 id
     return { records: data?.records || [], total: pageTotal(data?.total) }
   }
