@@ -65,10 +65,10 @@ test('官方文章编辑跳转官方编辑器，下架使用官方接口',async(
   assert.equal(p.state.calls.filter(c=>c.key==='review').length,0)
 })
 
-test('社区文章下架要求管理员审核权限，且保留版本',async()=>{
+test('社区文章下架要求内容编辑权限，且保留版本',async()=>{
   const p=page();await flush();await p.unpublishArticle({...article,state:'PUBLISHED'})
   const call=p.state.calls.find(c=>c.key==='review');assert.equal(call.args[0].revision,3);assert.equal(call.args[1],'HIDE')
-  const editor=page({role:'editor'});await flush();await editor.unpublishArticle({...article,state:'PUBLISHED'})
+  const editor=page({role:'editor',permission:false});await flush();await editor.unpublishArticle({...article,state:'PUBLISHED'})
   assert.equal(editor.state.calls.filter(c=>['review','setNewsStatus'].includes(c.key)).length,0)
   assert.equal(editor.saving.value,false)
 })
@@ -84,10 +84,21 @@ test('删除文章仅在有编辑权限时调用，并在取消下架确认后�
   assert.equal(cancel.saving.value,false)
 })
 
-test('非管理员只读，不能通过界面处理举报或终审发布',async()=>{
-  const p=page({role:'editor'});await flush();p.openReport(report);p.note.value='意见';await p.resolveReport()
+test('没有内容编辑权限时只读，不能通过界面处理举报或终审发布',async()=>{
+  const p=page({role:'editor',permission:false});await flush();p.openReport(report);p.note.value='意见';await p.resolveReport()
   p.selectedReport.value=null;p.selectedArticle.value=article;await p.decide('APPROVE')
   assert.equal(p.canReview.value,false);assert.equal(p.state.calls.filter(c=>['resolve','review'].includes(c.key)).length,0)
+})
+
+test('运营获得内容编辑权限后可处理举报，管理员身份也不能绕过缺失权限',async()=>{
+  const editor=page({role:'editor',permission:true,path:'/content/community-reports'});await flush()
+  editor.openReport(report);editor.note.value='根据授权完成核查';await editor.resolveReport()
+  assert.equal(editor.canReview.value,true)
+  assert.equal(editor.state.calls.filter(c=>c.key==='resolve').length,1)
+  const deniedAdmin=page({role:'admin',permission:false});await flush()
+  deniedAdmin.selectedArticle.value=article;deniedAdmin.note.value='尝试终审';await deniedAdmin.decide('APPROVE')
+  assert.equal(deniedAdmin.canReview.value,false)
+  assert.equal(deniedAdmin.state.calls.filter(c=>c.key==='review').length,0)
 })
 
 test('终审必须初审通过并提交当前版本，不伪造AI通过',async()=>{
