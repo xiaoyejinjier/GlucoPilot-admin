@@ -14,8 +14,17 @@
     <div class="kt-card">
       <el-alert v-if="config.hint" :title="config.hint" type="info" :closable="false" class="mb12" />
       <el-table :data="rows" v-loading="loading" row-key="id">
-        <el-table-column v-for="field in config.columns" :key="field.key" :label="field.label" :min-width="field.width || 130" show-overflow-tooltip>
-          <template #default="{ row }"><span>{{ display(row[field.key], field.key) }}</span></template>
+        <el-table-column v-for="field in config.columns" :key="field.key" :label="field.label" :min-width="field.width || 130" :show-overflow-tooltip="field.key !== 'permissionCodes'">
+          <template #default="{ row }">
+            <div v-if="field.key === 'permissionCodes'" class="perm-cell">
+              <template v-if="toPermList(row[field.key]).length">
+                <el-tag v-for="code in toPermList(row[field.key]).slice(0, 4)" :key="code" size="small" effect="plain" class="perm-cell-tag">{{ code }}</el-tag>
+                <el-tag v-if="toPermList(row[field.key]).length > 4" size="small" type="info" effect="plain">+{{ toPermList(row[field.key]).length - 4 }}</el-tag>
+              </template>
+              <span v-else class="text-muted">—</span>
+            </div>
+            <span v-else>{{ display(row[field.key], field.key) }}</span>
+          </template>
         </el-table-column>
         <el-table-column label="操作" width="190" fixed="right">
           <template #default="{ row }">
@@ -29,12 +38,18 @@
       </el-table>
     </div>
 
-    <el-dialog v-model="dialog.visible" :title="dialog.editing ? `编辑${config.singular}` : `新增${config.singular}`" width="620px" destroy-on-close>
+    <el-dialog v-model="dialog.visible" :title="dialog.editing ? `编辑${config.singular}` : `新增${config.singular}`" :width="config.resource === 'roles' ? '820px' : '620px'" destroy-on-close>
       <el-form label-width="120px">
         <el-form-item v-for="field in config.fields" :key="field.key" :label="field.label" :required="field.required">
           <el-select v-if="field.options" v-model="dialog.form[field.key]" filterable allow-create style="width: 100%">
             <el-option v-for="option in field.options" :key="String(option.value)" :label="option.label" :value="option.value" />
           </el-select>
+          <PermissionCodePicker
+            v-else-if="field.type === 'tags'"
+            :model-value="toPermList(dialog.form[field.key])"
+            :catalog="catalogPerms"
+            @update:model-value="dialog.form[field.key] = $event"
+          />
           <el-input v-else v-model="dialog.form[field.key]" :type="field.type || 'text'" :rows="field.type === 'textarea' ? 5 : undefined" :placeholder="field.placeholder" />
         </el-form-item>
       </el-form>
@@ -52,16 +67,37 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import { ruoyiApi, type RuoYiRow } from '@/api'
+import PermissionCodePicker from '@/components/PermissionCodePicker.vue'
 
 type FormValue = string | number | string[] | number[]
 type Field = {
   key: string
   label: string
   required?: boolean
-  type?: 'text' | 'textarea' | 'password'
+  type?: 'text' | 'textarea' | 'password' | 'tags'
   placeholder?: string
   options?: Array<{ label: string; value: string | number }>
 }
+
+const KNOWN_PERMISSIONS = [
+  '*:*:*',
+  'dashboard:view',
+  'content:news:list', 'content:news:edit', 'content:banner:manage', 'content:media:manage',
+  'food:library:manage',
+  'feedback:manage', 'feedback:reply',
+  'export:task:manage',
+  'user:manage',
+  'device:manage',
+  'health:archive:view', 'health:alert:view',
+  'message:push:manage',
+  'ai:config:manage', 'ai:audit:view', 'ai:memory:manage', 'ai:memory:view',
+  'ai:model:manage', 'ai:model:query', 'ai:prompt:list', 'ai:prompt:manage', 'ai:scene:list', 'ai:scene:manage',
+  'system:user:manage', 'system:role:manage', 'system:menu:manage', 'system:dept:manage', 'system:post:manage',
+  'system:dict:manage', 'system:config:manage', 'system:notice:manage', 'system:log:view',
+  'monitor:online:list', 'monitor:logininfor:list', 'monitor:operlog:list', 'monitor:server:list',
+  'monitor:cache:manage', 'monitor:job:manage',
+  'tool:gen:manage', 'tool:gen:list', 'tool:gen:query', 'tool:gen:edit', 'tool:gen:remove', 'tool:gen:code', 'tool:gen:import', 'tool:gen:preview'
+]
 type ResourceConfig = {
   title: string
   singular: string
@@ -86,7 +122,7 @@ const configs: Record<string, ResourceConfig> = {
   roles: {
     title: '角色管理', singular: '角色', resource: 'roles', description: '角色决定后台权限；权限标识与后端 @ss.hasPermi 规则保持一致。',
     columns: [{ key: 'roleCode', label: '角色编码' }, { key: 'roleName', label: '角色名称' }, { key: 'permissionCodes', label: '权限标识', width: 260 }, { key: 'status', label: '状态', width: 90 }, { key: 'remark', label: '说明' }],
-    fields: [{ key: 'roleCode', label: '角色编码', required: true }, { key: 'roleName', label: '角色名称', required: true }, { key: 'sortNo', label: '排序', required: true }, { key: 'status', label: '状态', required: true, options: statusOptions }, { key: 'permissionCodes', label: '权限标识', type: 'textarea', placeholder: '英文逗号分隔，如 system:user:manage' }, { key: 'remark', label: '备注', type: 'textarea' }]
+    fields: [{ key: 'roleCode', label: '角色编码', required: true }, { key: 'roleName', label: '角色名称', required: true }, { key: 'sortNo', label: '排序', required: true }, { key: 'status', label: '状态', required: true, options: statusOptions }, { key: 'permissionCodes', label: '权限标识', type: 'tags', placeholder: '树形勾选，支持搜索与自定义' }, { key: 'remark', label: '备注', type: 'textarea' }]
   },
   menus: {
     title: '菜单管理', singular: '菜单', resource: 'menus', description: '维护若依动态菜单与权限标识。目录类型 M、菜单 C、按钮 F。',
@@ -135,7 +171,30 @@ const config = computed(() => configs[String(route.meta.ruoyiResource)] || confi
 const rows = ref<RuoYiRow[]>([])
 const loading = ref(false)
 const saving = ref(false)
+const menuPermCodes = ref<string[]>([])
 const dialog = reactive<{ visible: boolean; editing: boolean; id: string | number | null; form: Record<string, FormValue> }>({ visible: false, editing: false, id: null, form: {} })
+
+function toPermList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean)
+  return String(value || '').split(/[,，\s]+/).map((item) => item.trim()).filter(Boolean)
+}
+
+const catalogPerms = computed(() => {
+  const set = new Set<string>([...KNOWN_PERMISSIONS, ...menuPermCodes.value])
+  return Array.from(set).sort((a, b) => a.localeCompare(b))
+})
+
+async function ensureMenuPerms() {
+  if (menuPermCodes.value.length || config.value.resource !== 'roles') return
+  try {
+    const menus = await ruoyiApi.list<RuoYiRow>('menus')
+    menuPermCodes.value = Array.from(new Set(
+      menus.map((row) => String(row.permCode || '').trim()).filter(Boolean)
+    )).sort((a, b) => a.localeCompare(b))
+  } catch {
+    menuPermCodes.value = []
+  }
+}
 
 function defaults() {
   const result: Record<string, FormValue> = {}
@@ -146,6 +205,7 @@ function defaults() {
     else if (field.key === 'type') result[field.key] = '1'
     else if (field.key === 'valueType') result[field.key] = '1'
     else if (field.key === 'jobGroup') result[field.key] = 'DEFAULT'
+    else if (field.type === 'tags') result[field.key] = []
     else result[field.key] = ''
   }
   return result
@@ -167,15 +227,18 @@ async function load() {
   }
 }
 
-function openCreate() {
+async function openCreate() {
+  await ensureMenuPerms()
   dialog.editing = false; dialog.id = null; dialog.form = defaults(); dialog.visible = true
 }
 
-function openEdit(row: RuoYiRow) {
+async function openEdit(row: RuoYiRow) {
+  await ensureMenuPerms()
   const form = defaults()
   for (const field of config.value.fields) {
     const value = field.key === 'status' ? row[statusField()] : row[field.key]
-    form[field.key] = Array.isArray(value) ? value.join(',') : value == null ? form[field.key] : String(value)
+    if (field.type === 'tags') form[field.key] = toPermList(value)
+    else form[field.key] = Array.isArray(value) ? value.join(',') : value == null ? form[field.key] : String(value)
   }
   if (config.value.resource === 'notices') {
     form.title = String(row.noticeTitle || '')
@@ -198,14 +261,18 @@ function payload() {
     body.roleCodes = split(body.roleCodes)
     body.postIds = split(body.postIds).map(Number).filter(Number.isFinite)
   }
-  if (config.value.resource === 'roles') body.permissionCodes = split(body.permissionCodes)
+  if (config.value.resource === 'roles') body.permissionCodes = toPermList(body.permissionCodes)
   return body
 }
 
 function split(value: unknown): string[] { return String(value || '').split(',').map((item) => item.trim()).filter(Boolean) }
+function isFilled(field: Field, value: FormValue | undefined) {
+  if (field.type === 'tags') return toPermList(value).length > 0
+  return String(value ?? '').trim().length > 0
+}
 async function save() {
   const required = config.value.fields.filter((field) => field.required && field.key !== 'password')
-  if (required.some((field) => !String(dialog.form[field.key] ?? '').trim())) return ElMessage.warning('请填写必填项')
+  if (required.some((field) => !isFilled(field, dialog.form[field.key]))) return ElMessage.warning('请填写必填项')
   if (config.value.resource === 'users' && !dialog.editing && !String(dialog.form.password || '').trim()) return ElMessage.warning('新增用户必须设置初始密码')
   saving.value = true
   try {
@@ -245,4 +312,6 @@ watch(() => config.value.resource, () => {
 .description { margin: 6px 0 0; font-size: 13px; }
 .actions { display: flex; flex: none; gap: 8px; }
 .mb12 { margin-bottom: 12px; }
+.perm-cell { display: flex; flex-wrap: wrap; gap: 6px; }
+.perm-cell-tag { max-width: 180px; }
 </style>
