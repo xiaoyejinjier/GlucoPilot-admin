@@ -3,6 +3,7 @@ import { api } from '@/api'
 import { adminConfig } from '@/config'
 import { getAccessToken, setAccessToken } from '@/utils/request'
 import type { Role } from '@/types'
+import { landingPath } from '@/utils/doctor-access'
 
 interface AccountSession {
   id: number
@@ -43,6 +44,7 @@ export const useAuthStore = defineStore('auth', {
       return true
     },
     role: (s) => (s.account ? s.account.role : 'editor'),
+    landingPath: (s) => landingPath(s.account),
     hasPermission: (s) => (permission: string) => {
       const permissions = s.account?.permissions || []
       // Mock 保持原有角色体验；真实环境由服务端下发权限作为唯一菜单依据。

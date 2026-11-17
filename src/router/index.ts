@@ -4,6 +4,7 @@ import type { Role } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { adminConfig } from '@/config'
 import { getAccessToken } from '@/utils/request'
+import { doctorPageAllowed } from '@/utils/doctor-access'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -11,6 +12,7 @@ declare module 'vue-router' {
     icon?: string
     roles?: Role[]
     permission?: string
+    doctorOnly?: boolean
     adminOnly?: boolean
     hidden?: boolean
     placeholder?: string
@@ -50,6 +52,14 @@ export const routes: RouteRecordRaw[] = [
       { path: 'user-service/glucose-alerts', name: 'glucose-alerts', component: () => import('@/views/users/GlucoseAlertsView.vue'), meta: { title: '异常血糖事件', icon: 'Warning', roles: ['admin'], permission: 'health:alert:view' } },
       { path: 'feedback', name: 'feedback', component: () => import('@/views/users/FeedbackView.vue'), meta: { title: '反馈管理', icon: 'ChatLineSquare', roles: ['admin', 'editor'], permission: 'feedback:manage' } },
       { path: 'user-service/messages', name: 'message-management', component: () => import('@/views/users/MessageManagementView.vue'), meta: { title: '信息管理', icon: 'ChatDotRound', roles: ['admin'], permission: 'user:manage', adminOnly: true } },
+      { path: 'user-service/consultations', redirect: '/doctor-management/reviews' },
+      { path: 'doctor-management/reviews', name: 'doctor-reviews', component: () => import('@/views/users/ConsultationManagementView.vue'), meta: { title: '医生审核', icon: 'DocumentChecked', permission: 'doctor:review:manage', adminOnly: true } },
+      { path: 'doctor-management/accounts', name: 'doctor-accounts', component: () => import('@/views/doctors/DoctorAccountsView.vue'), meta: { title: '医生账号', icon: 'User', permission: 'doctor:account:manage', adminOnly: true } },
+      { path: 'doctor-management/withdrawals', name: 'doctor-withdrawals', component: () => import('@/views/doctors/WithdrawalManagementView.vue'), meta: { title: '提现审核', icon: 'Wallet', permission: 'doctor:withdrawal:manage', adminOnly: true } },
+      { path: 'doctor-management/workbench', name: 'doctor-workbench', component: () => import('@/views/doctors/DoctorPortalView.vue'), meta: { title: '接诊工作台', icon: 'Service', permission: 'doctor:workbench:view', doctorOnly: true } },
+      { path: 'doctor-management/consultations', name: 'doctor-consultations', component: () => import('@/views/doctors/DoctorPortalView.vue'), meta: { title: '我的问诊', icon: 'ChatLineSquare', permission: 'doctor:consultation:manage', doctorOnly: true } },
+      { path: 'doctor-management/income', name: 'doctor-income', component: () => import('@/views/doctors/DoctorPortalView.vue'), meta: { title: '我的收入', icon: 'Wallet', permission: 'doctor:income:view', doctorOnly: true } },
+      { path: 'no-access', name: 'no-access', component: () => import('@/views/error/NoAccessView.vue'), meta: { title: '暂无可用功能', hidden: true } },
       { path: 'user-service/recommendations', name: 'recommendation-management', component: () => import('@/views/users/RecommendationManagementView.vue'), meta: { title: '推荐管理', icon: 'DataAnalysis', roles: ['admin'], permission: 'user:manage', adminOnly: true } },
       { path: 'exports', name: 'exports', component: () => import('@/views/users/ExportView.vue'), meta: { title: '导出任务', icon: 'Download', roles: ['admin', 'editor'], permission: 'export:task:manage' } },
       { path: 'system/users', name: 'system-users', component: () => import('@/views/system/RuoYiResourceView.vue'), meta: { title: '用户管理', icon: 'User', roles: ['admin'], permission: 'system:user:manage', ruoyiResource: 'users' } },
@@ -83,6 +93,7 @@ export const routes: RouteRecordRaw[] = [
 ]
 
 export interface MenuChild {
+  doctorOnly?: boolean
   path: string
   title: string
   icon?: string
@@ -91,6 +102,7 @@ export interface MenuChild {
   adminOnly?: boolean
 }
 export interface MenuGroup {
+  alwaysExpand?: boolean
   title: string
   icon: string
   roles: Role[]
@@ -122,6 +134,17 @@ export const menuGroups: MenuGroup[] = [
       { path: '/user-service/archives', title: '健康档案', icon: 'Files', roles: ['admin'], permission: 'health:archive:view' },
       { path: '/user-service/records', title: '九时段记录', icon: 'TrendCharts', roles: ['admin'], permission: 'health:archive:view' },
       { path: '/user-service/glucose-alerts', title: '异常血糖事件', icon: 'Warning', roles: ['admin'], permission: 'health:alert:view' }
+    ]
+  },
+  {
+    title: '医生管理', icon: 'Service', roles: ['admin', 'doctor'], alwaysExpand: true,
+    children: [
+      { path: '/doctor-management/reviews', title: '医生审核', icon: 'DocumentChecked', permission: 'doctor:review:manage', adminOnly: true },
+      { path: '/doctor-management/accounts', title: '医生账号', icon: 'User', permission: 'doctor:account:manage', adminOnly: true },
+        { path: '/doctor-management/withdrawals', title: '提现审核', icon: 'Wallet', permission: 'doctor:withdrawal:manage', adminOnly: true },
+      { path: '/doctor-management/workbench', title: '接诊工作台', icon: 'Service', permission: 'doctor:workbench:view', doctorOnly: true },
+      { path: '/doctor-management/consultations', title: '我的问诊', icon: 'ChatLineSquare', permission: 'doctor:consultation:manage', doctorOnly: true },
+      { path: '/doctor-management/income', title: '我的收入', icon: 'Wallet', permission: 'doctor:income:view', doctorOnly: true }
     ]
   },
   {
@@ -183,10 +206,12 @@ router.beforeEach((to) => {
     return { path: '/login', query: { redirect: to.fullPath } }
   }
   if (to.path === '/login' && auth.isLoggedIn) {
-    return { path: '/dashboard' }
+    return { path: auth.landingPath }
   }
+  if (auth.role === 'doctor' && to.path !== '/no-access' && !doctorPageAllowed(auth.account, to.path)) return { path: auth.landingPath }
+  if (to.meta.doctorOnly && auth.role !== 'doctor') return { path: auth.landingPath }
   const roles = to.meta.roles
-  if (to.meta.adminOnly && auth.role !== 'admin') return { path: '/dashboard' }
+  if (to.meta.adminOnly && auth.role !== 'admin') return { path: auth.landingPath }
   if (adminConfig.useMock && roles && auth.account && !roles.includes(auth.account.role)) {
     return { path: '/dashboard' }
   }

@@ -16,14 +16,14 @@
         <div class="summary">
           <div class="kt-card"><span>当前用户</span><strong>{{ report.user.nickname }}</strong><small>ID：{{ report.user.id }}</small></div>
           <div class="kt-card"><span>可推荐文章</span><strong>{{ report.candidateCount }} <small>篇</small></strong><small>展示前 {{ report.articles.length }} 篇</small></div>
-          <div class="kt-card"><span>兴趣标签</span><strong>{{ report.vector.length }} <small>个</small></strong><small>{{ report.coldStart ? '暂无行为，使用默认推荐' : '根据近 30 天有效行为计算' }}</small></div>
+          <div class="kt-card"><span>兴趣标签</span><strong>{{ report.vector.length }} <small>个</small></strong><small>{{ report.coldStart ? '今日暂无行为，使用探索推荐' : '根据北京时间当天有效行为计算' }}</small></div>
           <div class="kt-card"><span>生成时间</span><strong class="time">{{ fmtTime(report.generatedAt) }}</strong><small>本次查看不产生浏览记录</small></div>
         </div>
-        <el-alert v-if="report.coldStart" title="该用户暂无有效兴趣记录，当前按热度、新鲜度及关注作者推荐。" type="info" :closable="false" show-icon class="notice" />
+        <el-alert v-if="report.coldStart" title="该用户今天暂无有效兴趣记录，当前结合热度、新鲜度、关注及重复降权进行探索推荐。" type="info" :closable="false" show-icon class="notice" />
         <div class="kt-card flow-card">
           <el-collapse><el-collapse-item title="计算流程 · 点击展开" name="flow">
             <ol class="steps"><li v-for="(step, index) in report.steps" :key="index">{{ step }}</li></ol>
-            <p class="formula">总分 = 兴趣分 + 热度分 + 新鲜度分 + 关注分</p>
+            <p class="formula">最终分 =（兴趣分 + 热度分 + 新鲜度分 + 关注分）× 重复系数 × 0.95 + 探索分</p>
           </el-collapse-item></el-collapse>
         </div>
         <div class="kt-card vector-card">
@@ -31,7 +31,7 @@
           <el-table :data="report.vector" row-key="tagId" max-height="270" empty-text="暂无兴趣向量">
             <el-table-column prop="name" label="标签" min-width="150" />
             <el-table-column label="原始权重" min-width="120"><template #default="{ row }">{{ number(row.rawWeight) }}</template></el-table-column>
-            <el-table-column label="衰减后权重" min-width="140"><template #default="{ row }">{{ number(row.decayedWeight) }}</template></el-table-column>
+            <el-table-column label="今日有效权重" min-width="140"><template #default="{ row }">{{ number(row.decayedWeight) }}</template></el-table-column>
             <el-table-column label="向量值（权重 ÷ 范数）" min-width="190"><template #default="{ row }"><strong class="brand-text">{{ number(row.normalizedWeight, 6) }}</strong></template></el-table-column>
           </el-table>
         </div>
@@ -41,6 +41,8 @@
             <el-table-column type="index" label="排名" width="65" />
             <el-table-column label="文章 / 发布人" min-width="230"><template #default="{ row }"><div class="article-title">{{ row.title }}</div><div class="article-author">{{ row.author }} · #{{ row.id }}</div><div class="tags"><el-tag v-for="tag in row.tags" :key="tag.tagId" size="small" effect="plain">{{ tag.name }}</el-tag></div></template></el-table-column>
             <el-table-column label="总分" width="100"><template #default="{ row }"><strong class="total-score">{{ number(row.totalScore) }}</strong></template></el-table-column>
+            <el-table-column label="重复系数" width="110"><template #default="{row}">{{number(row.repeatFactor,3)}}</template></el-table-column>
+            <el-table-column label="探索 / 5" width="100"><template #default="{row}">{{number(row.explorationScore)}}</template></el-table-column>
             <el-table-column label="兴趣 / 60" width="110"><template #default="{ row }">{{ number(row.interestScore) }}</template></el-table-column>
             <el-table-column label="热度 / 15" width="110"><template #default="{ row }">{{ number(row.popularityScore) }}</template></el-table-column>
             <el-table-column label="新鲜度 / 15" width="115"><template #default="{ row }">{{ number(row.freshnessScore) }}</template></el-table-column>
@@ -65,7 +67,8 @@
           <p>相似度：{{ number(selectedArticle.similarity, 6) }}</p>
           <p>兴趣分：60 × {{ number(selectedArticle.similarity, 6) }} = {{ number(selectedArticle.interestScore) }}</p>
           <p>热度分：{{ number(selectedArticle.popularityScore) }}　新鲜度分：{{ number(selectedArticle.freshnessScore) }}　关注分：{{ number(selectedArticle.followingScore) }}</p>
-          <strong>总分：{{ number(selectedArticle.interestScore) }} + {{ number(selectedArticle.popularityScore) }} + {{ number(selectedArticle.freshnessScore) }} + {{ number(selectedArticle.followingScore) }} ≈ {{ number(selectedArticle.totalScore) }}</strong>
+          <p>基础分：{{number(selectedArticle.baseScore)}} · 重复系数：{{number(selectedArticle.repeatFactor,3)}} · 探索分：{{number(selectedArticle.explorationScore)}}</p>
+          <strong>最终分：{{number(selectedArticle.baseScore)}} × {{number(selectedArticle.repeatFactor,3)}} × 0.95 + {{number(selectedArticle.explorationScore)}} ≈ {{number(selectedArticle.totalScore)}}</strong>
         </div>
       </template>
     </el-dialog>

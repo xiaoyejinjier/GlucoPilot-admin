@@ -53,10 +53,12 @@
           <p class="full-text">用户回复：{{ currentDraft.userReply || '未填写' }}</p>
         </div>
         <template v-if="detail">
+          <el-alert v-if="measurementUpdated" class="measurement-update" title="该血糖记录已更新，之前的处理建议对应旧测量" :description="`之前 ${detail.history[0].glucoseValue} mmol/L，当前 ${detail.event.glucoseValue} mmol/L。请核对最新测量；历史处理记录保留在下方。`" type="warning" :closable="false" show-icon />
+          <el-alert v-if="detail.event.alertType === 'NORMAL'" title="当前测量已不属于异常范围，仅展示最新记录及历史处理。" type="success" :closable="false" show-icon />
           <div :class="['event-summary', detail.event.alertType.toLowerCase()]">
             <div>{{ detail.event.nickname }} · {{ detail.event.recordDate }} · {{ detail.event.nodeName }}</div>
-            <strong>{{ detail.event.glucoseValue }} <small>mmol/L · {{ detail.event.alertType === 'LOW' ? '低值提醒' : '高值提醒' }}</small></strong>
-            <div>{{ labels[detail.event.status] }} · {{ formatTime(detail.event.recordedAt) }}</div>
+            <strong>{{ detail.event.glucoseValue }} <small>mmol/L · {{ detail.event.alertType === 'NORMAL' ? '当前正常' : detail.event.alertType === 'LOW' ? '低值提醒' : '高值提醒' }}</small></strong>
+            <div>{{ detail.event.alertType === 'NORMAL' ? '无需异常处理' : labels[detail.event.status] }} · {{ formatTime(detail.event.recordedAt) }}</div>
           </div>
           <p class="full-text">原始备注：{{ detail.event.remark || '无' }}</p>
           <div class="public-reply">
@@ -86,7 +88,7 @@
               <el-button type="primary" :loading="saving" :disabled="needsRefresh || detailLoading" @click="save">{{ canHandle(detail.event) ? '保存处理记录及回复' : '保存用户回复' }}</el-button>
             </el-form>
           </template>
-          <el-alert v-else :title="auth.hasPermission('health:alert:handle') ? '本次事件已结束，处理记录已保留。新的测量异常将作为新快照待处理。' : '当前账号只有查看权限。'" type="info" :closable="false" />
+          <el-alert v-else :title="detail.event.alertType === 'NORMAL' ? '当前测量正常，历史处理仅供追溯。' : auth.hasPermission('health:alert:handle') ? '本次事件已结束，处理记录已保留。新的测量异常将作为新快照待处理。' : '当前账号只有查看权限。'" type="info" :closable="false" />
         </template>
       </div>
     </el-drawer>
@@ -95,6 +97,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { refreshWorkReminders } from '@/utils/work-reminders'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import TablePagination from '@/components/TablePagination.vue'
@@ -108,6 +112,7 @@ import { createGlucoseAlertDrafts } from '@/utils/glucose-alert-drafts'
 import type { AlertHandlingDraft } from '@/utils/glucose-alert-drafts'
 
 const auth = useAuthStore()
+const route = useRoute()
 const labels: Record<AlertStatus, string> = { PENDING: '待处理', PROCESSING: '跟进中', RESOLVED: '已处理', CLOSED: '已关闭' }
 const sources: Record<number, string> = { 1: '手动录入', 2: '拍照识别', 3: '设备同步' }
 function dateText(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` }
@@ -134,11 +139,14 @@ function search() {
 function reset() { dates.value = defaultDates(); keyword.value = ''; alertType.value = ''; status.value = ''; return search() }
 function formatTime(value: string | null) { return value ? value.replace('T', ' ').replace(/\.\d+$/, '') : '—' }
 function tagType(value: AlertStatus): 'danger' | 'warning' | 'success' | 'info' { return ({ PENDING: 'danger', PROCESSING: 'warning', RESOLVED: 'success', CLOSED: 'info' } as const)[value] }
-function canHandle(event: GlucoseAlert) { return auth.hasPermission('health:alert:handle') && (event.status === 'PENDING' || event.status === 'PROCESSING') }
-function canReply() { return auth.hasPermission('health:alert:handle') }
+function canHandle(event: GlucoseAlert) { return event.alertType !== 'NORMAL' && auth.hasPermission('health:alert:handle') && (event.status === 'PENDING' || event.status === 'PROCESSING') }
+function canReply() { return auth.hasPermission('health:alert:handle') && detail.value?.event.alertType !== 'NORMAL' }
 
 const drawerOpen = ref(false), detailLoading = ref(false), saving = ref(false), detailError = ref(''), activeId = ref('')
 const detail = ref<AlertDetail | null>(null)
+const measurementUpdated = computed(() => !!detail.value?.history.length &&
+  (Number(detail.value.history[0].glucoseValue) !== Number(detail.value.event.glucoseValue) ||
+   detail.value.history[0].recordedAt !== detail.value.event.recordedAt))
 const handlingStatus = ref<Exclude<AlertStatus, 'PENDING'>>('PROCESSING'), note = ref(''), userReply = ref('')
 const currentDraft = ref<AlertHandlingDraft | null>(null)
 const draftRestored = ref(false)
@@ -192,7 +200,7 @@ async function openDetail(id: string) {
     detail.value = data
     handlingStatus.value = data.event.status === 'PENDING' ? 'PROCESSING' : data.event.status
     note.value = data.event.note || ''; userReply.value = data.event.userReply || ''
-    if (pending && pending.userId === data.event.userId && canReply()) {
+    if (pending && pending.userId === data.event.userId && auth.hasPermission('health:alert:handle')) {
       draftRestored.value = true
       userReply.value = pending.userReply
       if (canHandle(data.event)) {
@@ -239,6 +247,7 @@ async function save() {
     if (!alive || version !== detailVersion || requestedOwner !== owner.value || getAccessToken() !== token) return
     drafts.remove(event.id); currentDraft.value = null; detail.value = null; draftStorageFailed.value = false; draftRestored.value = false
     ElMessage.success('处理结果已保存')
+    refreshWorkReminders()
     await Promise.all([openDetail(event.id), load()])
   } catch (error) {
     if (!alive || version !== detailVersion || requestedOwner !== owner.value || getAccessToken() !== token) return
@@ -257,11 +266,16 @@ watch(owner, () => {
   drawerOpen.value = false; needsRefresh.value = false; detailLoading.value = false; restoringDraft = false
   saving.value = false; draftStorageFailed.value = false; draftRestored.value = false; conflictMessage.value = ''; detailError.value = ''
 }, { flush: 'sync' })
-onMounted(() => { void load(); const id = drafts.active(); if (id && canReply()) void openDetail(id) })
+watch(() => route.query.reminder, () => {
+  const id = String(route.query.recordId || '')
+  if (/^[1-9]\d*$/.test(id)) void openDetail(id)
+})
+onMounted(() => { void load(); const id = String(route.query.recordId || drafts.active() || ''); if (/^[1-9]\d*$/.test(id)) void openDetail(id) })
 onBeforeUnmount(() => { keepDraft(); alive = false; ++detailVersion })
 </script>
 
 <style scoped>
+.measurement-update{margin-bottom:14px}
 .alerts-page { padding: 24px; }
 .alerts-heading { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:28px; }
 .alerts-heading h2 { margin:0 0 12px; font-size:24px; }

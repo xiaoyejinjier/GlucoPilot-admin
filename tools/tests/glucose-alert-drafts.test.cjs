@@ -29,6 +29,8 @@ function harness(options={}) {
   const servers = new Map([['10',event()],['11',event('11',{userId:'31'})]])
   const deps = {
     vue:{...vue,onMounted:fn=>mounted.push(fn),onBeforeUnmount:fn=>hooks.push(fn)},
+    'vue-router':{useRoute:()=>({query:{}})},
+    '@/utils/work-reminders':{refreshWorkReminders(){}},
     'element-plus':{ElMessage:{error:v=>state.errors.push(v),warning:v=>state.warnings.push(v),success:v=>state.successes.push(v)},
       ElMessageBox:{confirm:async()=>{state.confirmations++;if(options.cancelDiscard)throw Error('cancel')}}},
     '@element-plus/icons-vue':{},'@/components/TablePagination.vue':{},
@@ -60,6 +62,18 @@ function harness(options={}) {
   }))
   return {...module.exports,session,state,auth,servers,mount:()=>mounted.forEach(fn=>fn()),unmount(){hooks.forEach(fn=>fn());scope.stop()}}
 }
+
+test('异常更正为正常后仍保留未提交建议供复制，详情使用最新测量',async()=>{
+  const p=harness();await p.openDetail('10')
+  p.note.value='尚未提交的核对情况';p.userReply.value='尚未提交的建议'
+  p.servers.set('10',event('10',{glucoseValue:5.2,alertType:'NORMAL',recordedAt:'2026-11-04T08:10:00.000'}))
+  await p.refreshAll()
+  assert.equal(p.detail.value.event.glucoseValue,5.2)
+  assert.equal(p.currentDraft.value.note,'尚未提交的核对情况')
+  assert.equal(p.currentDraft.value.userReply,'尚未提交的建议')
+  await p.save();assert.equal(p.state.saves.length,0,'当前正常记录只能查看')
+  p.unmount()
+})
 
 test('12.6更正为12.5后冲突保留建议，显式刷新恢复输入并用最新快照提交',async()=>{
   const p=harness();await p.openDetail('10')

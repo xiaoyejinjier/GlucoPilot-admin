@@ -153,7 +153,7 @@ const remote = {
       id: Number(data.opsId),
       username: data.username,
       nickname: data.nickname,
-      role: data.role === 'admin' ? 'admin' : 'editor',
+      role: data.role === 'doctor' ? 'doctor' : data.role === 'admin' ? 'admin' : 'editor',
       status: 1,
       createdAt: '',
       lastLoginAt: new Date().toLocaleString('zh-CN', { hour12: false }),

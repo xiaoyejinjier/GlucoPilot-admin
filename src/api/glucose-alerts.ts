@@ -14,7 +14,7 @@ export interface GlucoseAlert {
   recordedAt: string
   sourceType: number
   remark: string | null
-  alertType: 'LOW' | 'HIGH'
+  alertType: 'LOW' | 'HIGH' | 'NORMAL'
   status: AlertStatus
   note: string | null
   version: number

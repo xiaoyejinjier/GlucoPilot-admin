@@ -93,7 +93,7 @@ const loading = ref(false)
 const accounts = ref<AdminAccount[]>([])
 const dialog = reactive({
   visible: false,
-  form: { id: 0, username: '', password: '', nickname: '', role: 'editor' as 'admin' | 'editor', status: 1 as 1 | 0 }
+  form: { id: 0, username: '', password: '', nickname: '', role: 'editor' as AdminAccount['role'], status: 1 as 1 | 0 }
 })
 
 const permRows = [

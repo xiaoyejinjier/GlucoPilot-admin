@@ -75,7 +75,7 @@ async function onSubmit() {
     try {
       const acc = await auth.login(form.username, form.password)
       ElMessage.success(`欢迎回来，${acc.nickname}`)
-      router.push((route.query.redirect as string) || '/dashboard')
+      router.push((route.query.redirect as string) || auth.landingPath)
     } catch (e) {
       ElMessage.error((e as Error).message || '登录失败')
     } finally {

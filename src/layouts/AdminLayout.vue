@@ -2,7 +2,7 @@
   <div class="admin-layout">
     <!-- 侧边栏 -->
     <aside class="layout-side" :class="{ collapsed: app.sidebarCollapsed }">
-      <div class="brand" @click="$router.push('/dashboard')">
+      <div class="brand" @click="$router.push(auth.landingPath)">
         <span class="brand-dot"></span>
         <div v-show="!app.sidebarCollapsed" class="brand-text">
           <div class="brand-name">控糖健康管理系统</div>
@@ -18,7 +18,7 @@
           class="kt-menu"
         >
           <template v-for="group in visibleGroups" :key="group.title">
-            <el-sub-menu v-if="group.children.length > 1" :index="group.title">
+            <el-sub-menu v-if="group.alwaysExpand || group.children.length > 1" :index="group.title">
               <template #title>
                 <el-icon><component :is="group.icon" /></el-icon>
                 <span>{{ group.title }}</span>
@@ -51,7 +51,7 @@
           </el-breadcrumb>
         </div>
         <div class="header-right">
-          <WorkReminders />
+          <WorkReminders v-if="auth.role !== 'doctor'" />
           <!-- 主题切换：与小程序 display-settings 的三主题对齐 -->
           <el-dropdown trigger="click" @command="changeTheme">
             <span class="header-action">
@@ -71,7 +71,7 @@
               <el-avatar :size="28" class="user-avatar">{{ (auth.account?.nickname || '管').slice(0, 1) }}</el-avatar>
               <span class="user-name">{{ auth.account?.nickname || auth.account?.username }}</span>
               <el-tag size="small" :type="auth.role === 'admin' ? 'warning' : 'success'" effect="light">
-                {{ auth.role === 'admin' ? '管理员' : '运营' }}
+                {{ auth.role === 'doctor' ? '医生' : auth.role === 'admin' ? '管理员' : '运营' }}
               </el-tag>
             </span>
             <template #dropdown>
@@ -101,6 +101,7 @@ import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { menuGroups, type MenuGroup } from '@/router'
 import { adminConfig } from '@/config'
+import { doctorPageAllowed } from '@/utils/doctor-access'
 import type { ThemeId } from '@/types'
 
 const app = useAppStore()
@@ -124,6 +125,8 @@ const activePath = computed(() => route.path)
 function filterChildren(g: MenuGroup): MenuGroup {
   const role = auth.account?.role
   const children = g.children.filter((c) => {
+    if (role === 'doctor') return doctorPageAllowed(auth.account, c.path)
+    if (c.doctorOnly) return false
     if (c.adminOnly && role !== 'admin') return false
     if (!adminConfig.useMock) return !c.permission || auth.hasPermission(c.permission)
     return !c.roles || !role || c.roles.includes(role)

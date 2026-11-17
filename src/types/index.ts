@@ -1,6 +1,6 @@
 /* 后台管理系统公共类型定义（后续接后端时作为 DTO 对齐参考） */
 
-export type Role = 'admin' | 'editor'
+export type Role = 'admin' | 'editor' | 'doctor'
 export type ThemeId = 'green' | 'teal' | 'simple'
 
 export interface AdminAccount {

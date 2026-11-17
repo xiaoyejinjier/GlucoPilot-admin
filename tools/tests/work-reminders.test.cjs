@@ -3,17 +3,49 @@ const ts=require('typescript'),{parse}=require('@vue/compiler-sfc'),root=path.re
 const tick=()=>new Promise(resolve=>setImmediate(resolve))
 function transpile(source){return ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText}
 function feed(){
-  const state={token:'first',calls:[],routes:[],timers:new Map(),listeners:new Map(),watchers:[],unmount:[],next:0},auth={account:{id:1,permissions:['feedback:manage','content:news:list']},isLoggedIn:true,hasPermission(code){return this.account?.permissions.includes(code)||false}}
+  const state={token:'first',calls:[],reads:[],routes:[],timers:new Map(),listeners:new Map(),watchers:[],unmount:[],next:0},auth={account:{id:1,permissions:['feedback:manage','content:news:list']},isLoggedIn:true,hasPermission(code){return this.account?.permissions.includes(code)||false}}
   const doc={visibilityState:'visible',addEventListener:(name,fn)=>state.listeners.set(name,fn),removeEventListener:name=>state.listeners.delete(name)}
   const win={addEventListener:doc.addEventListener,removeEventListener:doc.removeEventListener}
   const polling={exports:{}};vm.runInNewContext(transpile(fs.readFileSync(path.join(root,'src/utils/resource-monitor.ts'),'utf8')),{module:polling,exports:polling.exports,setTimeout:(fn,delay)=>{const id=++state.next;state.timers.set(id,{fn,delay});return id},clearTimeout:id=>state.timers.delete(id)})
   const targets={exports:{}};vm.runInNewContext(transpile(fs.readFileSync(path.join(root,'src/utils/work-reminders.ts'),'utf8')),{module:targets,exports:targets.exports})
-  const deps={vue:{ref:value=>({value}),computed:fn=>({get value(){return fn()}}),watch:(getter,fn,options)=>{state.watchers.push(fn);if(options?.immediate)fn()},onMounted:fn=>fn(),onBeforeUnmount:fn=>state.unmount.push(fn)},'vue-router':{useRouter:()=>({push:target=>state.routes.push(target)})},'@element-plus/icons-vue':{},'@/stores/auth':{useAuthStore:()=>auth},'@/utils/request':{getAccessToken:()=>state.token},'@/utils/resource-monitor':polling.exports,'@/utils/work-reminders':{...targets.exports,WORK_REMINDERS_CHANGED:'changed'},'@/api/work-reminders':{workRemindersApi:{summary:()=>new Promise((resolve,reject)=>state.calls.push({resolve,reject}))}}}
+  const deps={vue:{ref:value=>({value}),computed:fn=>({get value(){return fn()}}),watch:(getter,fn,options)=>{state.watchers.push(fn);if(options?.immediate)fn()},onMounted:fn=>fn(),onBeforeUnmount:fn=>state.unmount.push(fn)},'element-plus':{ElMessage:{success(){},warning(){}}},'vue-router':{useRouter:()=>({push:target=>state.routes.push(target)})},'@element-plus/icons-vue':{},'@/stores/auth':{useAuthStore:()=>auth},'@/utils/request':{getAccessToken:()=>state.token},'@/utils/resource-monitor':polling.exports,'@/utils/work-reminders':{...targets.exports,WORK_REMINDERS_CHANGED:'changed'},'@/api/work-reminders':{workRemindersApi:{summary:()=>new Promise((resolve,reject)=>state.calls.push({resolve,reject})),read:revisions=>new Promise((resolve,reject)=>state.reads.push({resolve,reject,revisions}))}}}
   const source=parse(fs.readFileSync(path.join(root,'src/components/WorkReminders.vue'),'utf8')).descriptor.scriptSetup.content
-  const module={exports:{}};vm.runInNewContext(transpile(source+'\nmodule.exports={summary,hasMessages,available,visible,loading,error,ready,open,refresh};'),{module,exports:module.exports,document:doc,window:win,require:name=>{assert.ok(deps[name],name);return deps[name]}})
+  const module={exports:{}};vm.runInNewContext(transpile(source+'\nmodule.exports={summary,hasMessages,available,visible,loading,error,ready,open,refresh,markRead,reading};'),{module,exports:module.exports,document:doc,window:win,require:name=>{assert.ok(deps[name],name);return deps[name]}})
   return {...module.exports,state,auth,doc,dispose(){state.unmount.forEach(fn=>fn())}}
 }
 const data={total:3,items:[{type:'REPORT',title:'新举报',count:2,latestAt:'2026-10-23T12:30:00'},{type:'FEEDBACK',title:'新反馈',count:1,latestAt:'2026-10-23T12:20:00'}]}
+
+test('管理员标记已读保留待办，作废在途旧统计，失败不消除红点',async()=>{
+  const p=feed(),item={...data.items[0],revision:'a'.repeat(64),pendingCount:2}
+  p.state.calls[0].resolve({total:2,items:[item]});await tick()
+  p.refresh()
+  const saving=p.markRead(item)
+  assert.equal(p.reading.value,true);assert.equal(p.state.reads.length,1)
+  assert.equal(p.state.reads[0].revisions.REPORT,item.revision)
+  p.state.reads[0].resolve();await saving
+  assert.equal(p.hasMessages.value,false);assert.equal(p.summary.value.items[0].pendingCount,2)
+  p.state.calls[1].resolve({total:2,items:[item]});await tick()
+  assert.equal(p.hasMessages.value,false,'旧轮询不能恢复已读红点')
+  p.dispose()
+  const failed=feed();failed.state.calls[0].resolve({total:2,items:[item]});await tick()
+  const attempt=failed.markRead();failed.state.reads[0].reject(new Error('offline'));await attempt
+  assert.equal(failed.summary.value.total,2);failed.dispose()
+})
+
+test('管理员切换账号丢弃旧已读回调，仅血糖查看权限也可看到更新并定位记录',async()=>{
+  const p=feed(),item={type:'GLUCOSE_UPDATE',title:'血糖记录已更新',count:1,pendingCount:1,revision:'b'.repeat(64),recordId:'10'}
+  p.auth.account={id:4,permissions:['health:alert:view']};p.state.token='health';p.state.watchers[0]()
+  assert.equal(p.available.value,true)
+  p.state.calls[1].resolve({total:1,items:[item]});await tick()
+  p.open(item);assert.equal(p.state.routes[0].path,'/user-service/glucose-alerts')
+  assert.equal(p.state.routes[0].query.recordId,'10')
+  const attempt=p.markRead(item)
+  p.auth.account={id:5,permissions:['health:alert:view']};p.state.token='other';p.state.watchers[0]()
+  p.state.calls[2].resolve({total:1,items:[item]});await tick()
+  p.state.reads[0].resolve();await attempt
+  assert.equal(p.summary.value.total,1,'旧管理员的已读结果不影响新账号')
+  p.dispose()
+})
 
 test('全局消息使用真实汇总，红点只随待办存在，消息点击跳到对应模块',async()=>{
   const p=feed();assert.equal(p.state.calls.length,1);assert.equal(p.hasMessages.value,false)

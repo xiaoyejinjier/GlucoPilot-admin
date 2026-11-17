@@ -4,7 +4,7 @@
     <el-pagination
       :current-page="pageNum"
       :page-size="pageSize"
-      :page-sizes="[10, 20, 50, 100]"
+      :page-sizes="pageSizes || [10, 20, 50, 100]"
       :total="total"
       :disabled="disabled"
       background
@@ -22,6 +22,7 @@ defineProps<{
   total: number
   summary: string
   disabled?: boolean
+  pageSizes?: number[]
 }>()
 
 const emit = defineEmits<{
