@@ -38,7 +38,10 @@
         <div class="stat-card">
           <div class="stat-label">输入 token</div>
           <div class="stat-value">{{ fmtNum(report?.totals.promptTokens) }}</div>
-          <div class="stat-sub">缓存命中 {{ fmtNum(report?.totals.cacheHitTokens) }}</div>
+          <div class="stat-sub">
+            命中 {{ fmtNum(report?.totals.cacheHitTokens) }} · 未命中
+            {{ fmtNum(report?.totals.cacheMissTokens) }}
+          </div>
         </div>
         <div class="stat-card">
           <div class="stat-label">输出 token</div>
@@ -48,7 +51,7 @@
         <div class="stat-card">
           <div class="stat-label">缓存命中率</div>
           <div class="stat-value">{{ fmtRate(report?.totals.cacheHitRate) }}</div>
-          <div class="stat-sub">命中部分按约 1/10 计价</div>
+          <div class="stat-sub">未命中部分按 30 倍计价（这才是成本）</div>
         </div>
       </div>
 
@@ -86,6 +89,14 @@
         </el-table-column>
         <el-table-column label="输入 token" width="120" align="right">
           <template #default="{ row }">{{ fmtNum(row.promptTokens) }}</template>
+        </el-table-column>
+        <el-table-column label="未命中 token" width="130" align="right">
+          <!-- 未命中 = 按全价计的部分。DeepSeek 命中/未命中是 1:30，所以这一列才是钱 -->
+          <template #default="{ row }">
+            <span :class="{ 'is-warn': (row.cacheMissTokens || 0) > 0 }">
+              {{ fmtNum(row.cacheMissTokens) }}
+            </span>
+          </template>
         </el-table-column>
         <el-table-column label="输出 token" width="120" align="right">
           <template #default="{ row }">{{ fmtNum(row.completionTokens) }}</template>

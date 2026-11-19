@@ -763,6 +763,10 @@ export interface AiChatContextShard {
   contextKey: string | null
   tokenEstimate: number | null
   sortNo: number | null
+  /** V78：本轮窗口是否滑动（丢弃了窗口外的旧消息）；只有历史分片带值，其余为 null */
+  windowShifted?: boolean | null
+  /** V78：本轮生效的窗口条数上限；同上，只有历史分片带值 */
+  windowMessages?: number | null
 }
 
 /** 一轮 prompt 的分片组成。token 是装配期估算，不是厂商返回的 usage。 */
@@ -773,6 +777,8 @@ export interface AiChatContextRound {
   modelCode: string | null
   totalTokens: number
   shards: AiChatContextShard[]
+  /** 后端拼好的一句话说明，如「本轮窗口已滑动 · 窗口 20 条上限」；老数据为空 */
+  notice?: string | null
 }
 
 /** 一个会话的分片审计（GET /admin/v1/ai/chat-sessions/{id}/context）。 */
