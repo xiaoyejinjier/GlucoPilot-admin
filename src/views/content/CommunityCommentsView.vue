@@ -2,13 +2,16 @@
   <div class="page-wrap comment-moderation">
     <div class="head">
       <div>
-        <h2 class="page-title">社区评论管理</h2>
+        <h2 class="page-title">{{ articleId ? '文章评论' : '社区评论管理' }}</h2>
         <p class="text-muted description">评论是先发后审：AI 判违规会立即隐藏并移出公开列表。运营也可以主动隐藏机器放行的内容，两种情况都能在这里恢复。</p>
       </div>
       <div class="heading-actions">
+        <el-button @click="router.push('/content/community')">返回文章管理</el-button>
+        <el-button v-if="articleId" @click="router.push('/content/community-comments')">查看全部评论</el-button>
         <el-button :icon="Refresh" :loading="loading" @click="load">刷新列表</el-button>
       </div>
     </div>
+    <div v-if="articleId" class="article-context"><span>当前文章：<strong>{{ articleTitle || ('#' + articleId) }}</strong></span><span class="text-muted">#{{ articleId }}</span></div>
     <el-alert title="AI 审核失败（判定为异常）时不会隐藏评论 —— 模型故障不该让社区停摆，但也不等于通过，建议按下「AI 判定：异常」复查一遍。" type="info" :closable="false" show-icon class="mb16" />
     <div class="kt-card moderation-card">
       <form class="review-filters" @submit.prevent="search">
@@ -86,8 +89,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { communityApi, type AdminComment } from '@/api/community'
@@ -95,6 +98,9 @@ import { useAuthStore } from '@/stores/auth'
 import { getAccessToken } from '@/utils/request'
 
 const router = useRouter()
+const route = useRoute()
+const articleId = computed(() => typeof route.query.newsId === 'string' ? route.query.newsId : '')
+const articleTitle = computed(() => typeof route.query.title === 'string' ? route.query.title.slice(0, 200) : '')
 const auth = useAuthStore()
 const canManage = computed(() => auth.hasPermission('content:news:edit'))
 
@@ -130,7 +136,11 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const result = await communityApi.comments({ ...applied, pageNum: pageNum.value })
+    if (articleId.value && (!/^[1-9]\d{0,18}$/.test(articleId.value) || (articleId.value.length === 19 && articleId.value > '9223372036854775807'))) {
+      rows.value = []; total.value = 0
+      throw new Error('文章编号无效，请返回文章管理重新选择')
+    }
+    const result = await communityApi.comments({ ...applied, pageNum: pageNum.value, newsId: articleId.value || undefined })
     if (!current(token) || id !== run) return
     rows.value = result.records
     total.value = result.total
@@ -171,13 +181,15 @@ async function setHidden(row: AdminComment, hidden: boolean) {
 }
 
 onBeforeUnmount(() => { alive = false; run++ })
-void load()
+watch(() => route.query.newsId, () => { Object.assign(query, { status: '', verdict: '', hidden: '', keyword: '' }); Object.assign(applied, query); rows.value = []; total.value = 0; pageNum.value = 1; void load() }, { immediate: true })
 </script>
 
 <style scoped>
 .head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px}
 .page-title{margin:0;font-size:18px;color:var(--kt-ink)}
 .description{margin:6px 0 0;font-size:13px;line-height:1.7}
+.heading-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0}.heading-actions :deep(.el-button+.el-button){margin-left:0}
+.article-context{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 18px;margin-bottom:16px;border:1px solid var(--kt-line);border-radius:10px;background:var(--kt-surface);font-size:13px;overflow-wrap:anywhere}
 .mb16{margin-bottom:16px}
 .moderation-card{padding-top:24px}
 .review-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;align-items:end;gap:18px;margin-bottom:18px}

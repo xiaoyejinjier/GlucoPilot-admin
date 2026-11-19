@@ -46,8 +46,8 @@
             <Fold v-else />
           </el-icon>
           <el-breadcrumb separator="/">
-            <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
-            <el-breadcrumb-item v-for="m in breadcrumbs" :key="m.path || m.title">{{ m.title }}</el-breadcrumb-item>
+            <el-breadcrumb-item :to="{ path: auth.landingPath }">首页</el-breadcrumb-item>
+            <el-breadcrumb-item v-for="m in breadcrumbs" :key="m.path" :to="{ path: m.path }">{{ m.title }}</el-breadcrumb-item>
           </el-breadcrumb>
         </div>
         <div class="header-right">
@@ -120,7 +120,7 @@ function changeTheme(id: ThemeId) {
   app.applyTheme()
 }
 
-const activePath = computed(() => route.path)
+const activePath = computed(() => route.meta.activeMenu || route.path)
 
 function filterChildren(g: MenuGroup): MenuGroup {
   const role = auth.account?.role
@@ -141,9 +141,22 @@ const visibleGroups = computed(() =>
 )
 
 const breadcrumbs = computed(() => {
-  return route.matched
-    .filter((m) => m.meta?.title && !m.meta.hidden && m.path !== '/')
-    .map((m) => ({ title: m.meta.title as string, path: m.path }))
+  const items = route.matched
+    .filter((m) => m.meta?.title && (!m.meta.hidden || m.meta.activeMenu) && m.path !== '/')
+    .map((m) => ({
+      title: m.meta.breadcrumbTitle || m.meta.title as string,
+      path: m === route.matched[route.matched.length - 1] ? route.path : m.path
+    }))
+  // 平铺路由的子页也显示所属功能入口；直接访问或刷新仍能还原层级。
+  const parentPath = route.meta.activeMenu
+  if (parentPath && parentPath !== route.path && !items.some((m) => m.path === parentPath)) {
+    const parent = [...router.resolve(parentPath).matched].reverse().find((m) => m.meta?.title)
+    if (parent) items.splice(Math.max(0, items.length - 1), 0, {
+      title: parent.meta.breadcrumbTitle || parent.meta.title as string,
+      path: parentPath
+    })
+  }
+  return items
 })
 
 function onUserCommand(cmd: string) {

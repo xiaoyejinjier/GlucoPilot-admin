@@ -6,6 +6,10 @@
         <p class="text-muted description">{{ reportMode ? '认真回应每一条反馈，一起维护友善的交流环境。' : '查看全部文章、发布人与状态，统一管理官方资讯和社区投稿。' }}</p>
       </div>
       <div class="heading-actions">
+        <template v-if="!reportMode">
+          <el-button @click="router.push('/content/community-comments')">全部评论</el-button>
+          <el-button @click="router.push('/content/community-tags')">标签管理</el-button>
+        </template>
         <el-button v-if="!reportMode && auth.hasPermission('content:news:edit')" type="primary" @click="router.push('/content/news/new')">发布官方文章</el-button>
         <el-button :icon="Refresh" :loading="loading" @click="load">刷新列表</el-button>
       </div>
@@ -48,6 +52,7 @@
             <el-button v-else link type="primary" @click="openArticle(row)">查看详情</el-button>
           </template>
         </el-table-column>
+        <el-table-column label="评论" width="110" fixed="right"><template #default="{row}"><el-button link type="primary" @click="viewComments(row)">查看评论</el-button></template></el-table-column>
         <template #empty><el-empty :description="error ? '暂时无法加载文章，请稍后刷新' : '当前没有符合条件的文章'" :image-size="80" /></template>
       </el-table>
       <div class="review-pagination"><span>每页 10 条</span><el-pagination background layout="prev, pager, next, jumper" :total="total" :page-size="10" :current-page="pageNum" :disabled="loading" @update:current-page="changePage" /></div>
@@ -143,6 +148,9 @@ function editArticle(row: CommunityArticle) {
   }
   openArticle(row)
 }
+function viewComments(row: CommunityArticle) {
+  router.push({ path: '/content/community-comments', query: { newsId: String(row.id), title: row.title } })
+}
 async function unpublishArticle(row: CommunityArticle) {
   if (!canEdit.value || row.state !== 'PUBLISHED' || saving.value) return
   saving.value = true
@@ -221,5 +229,7 @@ onBeforeUnmount(() => { ++listRun; ++detailRun })
 
 <style scoped>
 .review-photo-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:18px 0; }
+.heading-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; }
+.heading-actions :deep(.el-button+.el-button) { margin-left:0; }
 @media(max-width:760px) { .review-photo-grid { grid-template-columns:1fr; } }
 </style>

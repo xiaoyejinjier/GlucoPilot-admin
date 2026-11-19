@@ -20,7 +20,7 @@ function page(options={}) {
   }
   const script=parse(fs.readFileSync(path.join(root,'src/views/content/CommunityReviewView.vue'),'utf8')).descriptor.scriptSetup.content
   const module={exports:{}}
-  vm.runInNewContext(ts.transpileModule(script+'\nmodule.exports={load,search,resetFilters,openReport,openArticle,editArticle,unpublishArticle,removeArticle,resolveReport,decide,note,resolution,selectedReport,selectedArticle,drawer,canReview,saving,status,source,keyword,pageNum,articles,reports,detailError};',{
+  vm.runInNewContext(ts.transpileModule(script+'\nmodule.exports={viewComments,load,search,resetFilters,openReport,openArticle,editArticle,unpublishArticle,removeArticle,resolveReport,decide,note,resolution,selectedReport,selectedArticle,drawer,canReview,saving,status,source,keyword,pageNum,articles,reports,detailError};',{
     compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}
   }).outputText,{module,exports:module.exports,require:key=>{assert.ok(deps[key],key);return deps[key]}})
   return {...module.exports,state,route,auth}
@@ -44,6 +44,12 @@ test('文章管理默认读取全部状态与来源，按发布人搜索时回�
   p.pageNum.value=3;p.source.value='COMMUNITY';p.keyword.value='小明';p.status.value='PUBLISHED';p.search();await flush()
   assert.deepEqual(p.state.calls.filter(c=>c.key==='articles').at(-1).args,['PUBLISHED',1,'COMMUNITY','小明'])
   p.resetFilters();await flush();assert.deepEqual(p.state.calls.filter(c=>c.key==='articles').at(-1).args,['',1,'',''])
+})
+
+test('文章查看评论跳转时传入当前文章编号与标题',async()=>{
+  const p=page();await flush();p.viewComments(article)
+  assert.equal(p.state.routes[0].path,'/content/community-comments')
+  assert.equal(p.state.routes[0].query.newsId,'7');assert.equal(p.state.routes[0].query.title,'投稿文章')
 })
 
 test('停留举报页面时再次点击全局提醒，恢复待处理筛选并回第一页',async()=>{

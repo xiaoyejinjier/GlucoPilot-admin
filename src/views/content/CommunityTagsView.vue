@@ -1,6 +1,6 @@
 <template>
   <div class="page-wrap tag-management">
-    <div class="tag-page-heading"><div><h2 class="page-title">社区标签管理</h2><p>管理社区分类和发文标签，修改后小程序刷新即可同步。</p></div><el-button v-if="canManage" type="primary" @click="openEditor()">新增分类</el-button></div>
+    <div class="tag-page-heading"><div><h2 class="page-title">社区标签管理</h2><p>管理社区分类和发文标签，修改后小程序刷新即可同步。</p></div><div class="tag-page-actions"><router-link to="/content/community"><el-button>返回文章管理</el-button></router-link><el-button v-if="canManage" type="primary" @click="openEditor()">新增分类</el-button></div></div>
     <el-alert title="用户自建标签归入“其他”；删除标签后用户不能再选择，已发布文章保留。" type="info" :closable="false" show-icon />
     <div class="kt-card tag-table-card">
       <div class="tag-filters">
@@ -75,5 +75,6 @@ onBeforeUnmount(()=>{alive=false;run++});void load()
 </script>
 
 <style scoped>
+.tag-page-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.tag-page-actions a{text-decoration:none}
 .tag-page-heading{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:20px}.tag-page-heading p{color:var(--kt-text-secondary,#7c8798);margin:8px 0 0;line-height:1.7}.tag-table-card{margin-top:20px;padding:22px}.tag-filters{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:22px}.tag-filters>.el-input{width:260px}.tag-filters>.el-select{width:175px}.tag-name{font-weight:600}.fixed-tag{margin-left:10px}.tag-pagination{display:flex;justify-content:flex-end;margin-top:22px}.table-error{margin-bottom:16px}.sort-help{margin-left:14px;color:#8793a4;font-size:12px}@media(max-width:760px){.tag-page-heading{align-items:flex-start;flex-direction:column}.tag-table-card{padding:14px}.tag-filters>.el-input,.tag-filters>.el-select{width:100%}.tag-pagination{overflow:auto;justify-content:flex-start}}
 </style>

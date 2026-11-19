@@ -33,8 +33,8 @@ export const communityApi = {
   article: (id: string) => get<CommunityArticle>(`/admin/v1/community/articles/${encodeURIComponent(id)}`),
   review: (article: CommunityArticle, decision: string, note: string) => post<CommunityArticle>(`/admin/v1/community/articles/${encodeURIComponent(article.id)}/review`, { revision: article.revision, decision, note }),
   retryAi: (id: string) => post(`/admin/v1/community/articles/${encodeURIComponent(id)}/retry-ai`),
-  comments: (filters: { status: string; verdict: string; hidden: string; keyword: string; pageNum: number }) =>
-    get<CommunityPage<AdminComment>>(`/admin/v1/community/comments?${query({ ...filters, keyword: filters.keyword.trim(), pageSize: 10 })}`),
+  comments: (filters: { status: string; verdict: string; hidden: string; keyword: string; pageNum: number; newsId?: string }) =>
+    get<CommunityPage<AdminComment>>(`/admin/v1/community/comments?${query({ ...filters, newsId: filters.newsId || '', keyword: filters.keyword.trim(), pageSize: 10 })}`),
   /** 设置评论可见性：hidden=true 隐藏，false 恢复显示。人工动作与 AI 判定并存，互不改写。 */
   setCommentVisibility: (id: string, hidden: boolean) =>
     put(`/admin/v1/community/comments/${encodeURIComponent(id)}/visibility`, { hidden }),
