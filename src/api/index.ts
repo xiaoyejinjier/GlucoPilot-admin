@@ -649,11 +649,12 @@ function normalizePromptRow(row: AiPromptTemplateRow): AiPromptTemplateRow {
   }
 }
 
-/** 提示词模板：只走真实后端（不参与 Mock 分支）。写操作要 ai:prompt:manage。 */
+/** 用量报表：只走真实后端（不参与 Mock 分支）。读权限 ai:usage:view。 */
 export const aiUsageApi = {
   /**
    * 用量报表：区间为空时后端默认最近 7 天（上限 92 天）。
-   * 口径只有「天 × 模型」——chat_message 没有场景列，SUMMARY/MEMORY 等链路也没落 token。
+   * 口径是「天 × 场景 × 模型」的**模型调用流水**（ai_call_log）：摘要、记忆抽取、审核、翻译都入账，
+   * 与 chat_message 上「按轮」的 token 不可相加——后端返回的 note 会原样展示这句。
    */
   async report(startDate?: string, endDate?: string): Promise<AiUsageReport> {
     requireRemote()
@@ -664,20 +665,31 @@ export const aiUsageApi = {
     const raw = await get<AiUsageReport>(`/admin/v1/ai/usage${suffix ? `?${suffix}` : ''}`)
     // 后端把 Long 序列化成字符串（避免 JS 精度丢失），这里统一转回数字：
     // 否则表格里 toLocaleString 作用在字符串上，千分位不生效，排序与求和也是字符串语义。
+    // cacheHitRate 例外：null 表示「上游没上报」，不能被 Number(null ?? 0) 洗成 0（那会读成 0%）。
+    const rate = (value: number | null | undefined): number | null =>
+      value === null || value === undefined ? null : Number(value)
     return {
       ...raw,
       rows: (raw.rows || []).map((row) => ({
         ...row,
         promptTokens: Number(row.promptTokens ?? 0),
         completionTokens: Number(row.completionTokens ?? 0),
+        cacheHitTokens: Number(row.cacheHitTokens ?? 0),
+        cacheMissTokens: Number(row.cacheMissTokens ?? 0),
+        cacheHitRate: rate(row.cacheHitRate),
         totalTokens: Number(row.totalTokens ?? 0),
-        calls: Number(row.calls ?? 0)
+        calls: Number(row.calls ?? 0),
+        failedCalls: Number(row.failedCalls ?? 0)
       })),
       totals: {
         promptTokens: Number(raw.totals?.promptTokens ?? 0),
         completionTokens: Number(raw.totals?.completionTokens ?? 0),
+        cacheHitTokens: Number(raw.totals?.cacheHitTokens ?? 0),
+        cacheMissTokens: Number(raw.totals?.cacheMissTokens ?? 0),
+        cacheHitRate: rate(raw.totals?.cacheHitRate),
         totalTokens: Number(raw.totals?.totalTokens ?? 0),
-        calls: Number(raw.totals?.calls ?? 0)
+        calls: Number(raw.totals?.calls ?? 0),
+        failedCalls: Number(raw.totals?.failedCalls ?? 0)
       }
     }
   }

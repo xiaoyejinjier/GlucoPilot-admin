@@ -338,23 +338,39 @@ export interface AiModelRow {
 }
 
 /** 列表接口附带的"当前生效情况"，用来解释"为什么用的是这个模型" */
-/** AI 用量报表的一行：某一天 × 某个模型。 */
+/** AI 用量报表的一行：某一天 × 某个场景 × 某个模型（数据源 ai_call_log）。 */
 export interface AiUsageRow {
   /** yyyy-MM-dd */
   date: string
+  /** 场景编码（CHAT / SUMMARY / MEMORY / ...）；空串＝未归属（框架内部调用、启动探活） */
+  sceneCode: string
+  /** 场景中文名；未知编码回显编码本身，空串显示「（未归属）」 */
+  sceneLabel: string
   /** 模型编码；历史行没记模型时为「（未记录）」 */
   modelCode: string
   promptTokens: number
   completionTokens: number
+  /** 缓存命中 / 未命中的 token；两列都为 0 表示上游没上报过 */
+  cacheHitTokens: number
+  cacheMissTokens: number
+  /** 命中率 0~1（后端保留 4 位）；null 表示「没上报」，与 0% 是两回事 */
+  cacheHitRate: number | null
   totalTokens: number
+  /** 调用次数（账本行数：一个场景调几次算几次，不是会话条数） */
   calls: number
+  /** 其中失败次数（ok=0）：失败同样消耗配额，所以单列而不从合计里剔除 */
+  failedCalls: number
 }
 
 export interface AiUsageTotals {
   promptTokens: number
   completionTokens: number
+  cacheHitTokens: number
+  cacheMissTokens: number
+  cacheHitRate: number | null
   totalTokens: number
   calls: number
+  failedCalls: number
 }
 
 export interface AiUsageReport {
@@ -362,7 +378,7 @@ export interface AiUsageReport {
   endDate: string
   rows: AiUsageRow[]
   totals: AiUsageTotals
-  /** 口径说明，前后端必须一致：只统计对话链路已落库的 token */
+  /** 口径说明，前后端必须一致：按调用（ai_call_log），与 chat_message 的按轮不可相加 */
   note: string
 }
 export interface AiModelListMeta {

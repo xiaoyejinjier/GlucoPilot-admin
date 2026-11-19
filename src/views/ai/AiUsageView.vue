@@ -3,8 +3,8 @@
     <div class="head">
       <h2 class="page-title">AI 用量</h2>
       <span class="text-muted">
-        只统计<strong>对话链路</strong>已落库的 token（<code>chat_message.prompt_tokens / completion_tokens</code>）；
-        摘要、记忆抽取、内容审核、饮食识别这些内部调用目前不写用量，不在此表内。
+        口径是<strong>模型调用流水</strong>（<code>ai_call_log</code>）：一次模型请求一行，摘要、记忆抽取、内容审核、翻译都在内。
+        它与 <code>chat_message</code> 上「按轮」的 token <strong>不可相加</strong>（后者工具回环里只留最后一次用量）。
       </span>
     </div>
 
@@ -31,18 +31,24 @@
         <div class="stat-card">
           <div class="stat-label">调用次数</div>
           <div class="stat-value">{{ fmtNum(report?.totals.calls) }}</div>
+          <div class="stat-sub" :class="{ 'is-warn': (report?.totals.failedCalls || 0) > 0 }">
+            失败 {{ fmtNum(report?.totals.failedCalls) }} 次
+          </div>
         </div>
         <div class="stat-card">
           <div class="stat-label">输入 token</div>
           <div class="stat-value">{{ fmtNum(report?.totals.promptTokens) }}</div>
+          <div class="stat-sub">缓存命中 {{ fmtNum(report?.totals.cacheHitTokens) }}</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">输出 token</div>
           <div class="stat-value">{{ fmtNum(report?.totals.completionTokens) }}</div>
+          <div class="stat-sub">合计 {{ fmtNum(report?.totals.totalTokens) }}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">合计 token</div>
-          <div class="stat-value">{{ fmtNum(report?.totals.totalTokens) }}</div>
+          <div class="stat-label">缓存命中率</div>
+          <div class="stat-value">{{ fmtRate(report?.totals.cacheHitRate) }}</div>
+          <div class="stat-sub">命中部分按约 1/10 计价</div>
         </div>
       </div>
 
@@ -51,10 +57,18 @@
         v-loading="loading"
         height="100%"
         class="paginated-table"
-        empty-text="所选区间内没有用量记录"
+        empty-text="所选区间内没有调用记录"
       >
-        <el-table-column label="日期" width="130" prop="date" />
-        <el-table-column label="模型" min-width="200" show-overflow-tooltip>
+        <el-table-column label="日期" width="120" prop="date" />
+        <el-table-column label="场景" min-width="130" show-overflow-tooltip>
+          <template #default="{ row }">
+            <el-tag v-if="!row.sceneCode" size="small" type="info" effect="plain" disable-transitions>
+              {{ row.sceneLabel }}
+            </el-tag>
+            <span v-else>{{ row.sceneLabel }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="模型" min-width="170" show-overflow-tooltip>
           <template #default="{ row }">
             <el-tag v-if="row.modelCode === UNKNOWN_MODEL" size="small" type="info" effect="plain" disable-transitions>
               {{ row.modelCode }}
@@ -62,16 +76,24 @@
             <span v-else>{{ row.modelCode }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="调用次数" width="110" align="right">
+        <el-table-column label="调用" width="90" align="right">
           <template #default="{ row }">{{ fmtNum(row.calls) }}</template>
         </el-table-column>
-        <el-table-column label="输入 token" width="130" align="right">
+        <el-table-column label="失败" width="80" align="right">
+          <template #default="{ row }">
+            <span :class="{ 'is-warn': row.failedCalls > 0 }">{{ fmtNum(row.failedCalls) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="输入 token" width="120" align="right">
           <template #default="{ row }">{{ fmtNum(row.promptTokens) }}</template>
         </el-table-column>
-        <el-table-column label="输出 token" width="130" align="right">
+        <el-table-column label="输出 token" width="120" align="right">
           <template #default="{ row }">{{ fmtNum(row.completionTokens) }}</template>
         </el-table-column>
-        <el-table-column label="合计 token" width="130" align="right">
+        <el-table-column label="命中率" width="100" align="right">
+          <template #default="{ row }">{{ fmtRate(row.cacheHitRate) }}</template>
+        </el-table-column>
+        <el-table-column label="合计 token" width="120" align="right">
           <template #default="{ row }">{{ fmtNum(row.totalTokens) }}</template>
         </el-table-column>
       </el-table>
@@ -127,6 +149,12 @@ async function load() {
 function fmtNum(value?: number | null) {
   return (value ?? 0).toLocaleString('zh-CN')
 }
+
+/** null = 上游没上报，显示「—」而不是 0%：两者含义完全不同。 */
+function fmtRate(value?: number | null) {
+  if (value === null || value === undefined) return '—'
+  return `${(value * 100).toFixed(1)}%`
+}
 </script>
 
 <style scoped>
@@ -149,6 +177,16 @@ function fmtNum(value?: number | null) {
   font-size: 22px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+.stat-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.stat-sub.is-warn,
+.is-warn {
+  color: var(--el-color-warning);
 }
 .note-line {
   margin-top: 10px;
