@@ -26,6 +26,9 @@ interface AdminFeedbackRow {
   userName: string
   contact?: string | null
   feedbackType: number
+  feedbackTypeName?: string
+  deviceId?: string | null
+  deviceDescription?: string | null
   contentText: string
   replyStatus: number
   officialReply?: string | null
@@ -67,6 +70,7 @@ interface AdminUserRow {
 }
 
 const feedbackTypes: Record<number, FeedbackType> = {
+  5: '设备支持',
   1: '产品建议',
   2: 'Bug问题',
   3: '功能诉求',
@@ -114,7 +118,9 @@ function mapFeedback(row: AdminFeedbackRow): Feedback {
     id: Number(row.id),
     userId: Number(row.userId),
     userName: row.userName || `用户#${row.userId}`,
-    type: feedbackTypes[row.feedbackType] || '其他',
+    type: row.feedbackTypeName || feedbackTypes[row.feedbackType] || '其他',
+    deviceId: row.deviceId || undefined,
+    deviceDescription: row.deviceDescription || '',
     content: row.contentText || '',
     contact: row.contact || '',
     status: feedbackStatus(row.officialReply),
@@ -429,6 +435,9 @@ const remote = {
   async listFeedback() {
     const page = await get<PageData<AdminFeedbackRow>>('/admin/v1/feedbacks?pageNum=1&pageSize=100')
     return (page.records || []).map(mapFeedback)
+  },
+  async feedbackTypeOptions() {
+    return get<import('@/types').FeedbackTypeOption[]>('/admin/v1/feedbacks/types')
   },
   async pageFeedback(params: { pageNum: number; pageSize: number; keyword?: string; feedbackType?: number; replyStatus?: number }) {
     const page = await get<PageData<AdminFeedbackRow>>(`/admin/v1/feedbacks?${queryString(params)}`)

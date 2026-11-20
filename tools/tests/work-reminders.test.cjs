@@ -5,15 +5,67 @@ function transpile(source){return ts.transpileModule(source,{compilerOptions:{mo
 function feed(){
   const state={token:'first',calls:[],reads:[],routes:[],timers:new Map(),listeners:new Map(),watchers:[],unmount:[],next:0},auth={account:{id:1,permissions:['feedback:manage','content:news:list']},isLoggedIn:true,hasPermission(code){return this.account?.permissions.includes(code)||false}}
   const doc={visibilityState:'visible',addEventListener:(name,fn)=>state.listeners.set(name,fn),removeEventListener:name=>state.listeners.delete(name)}
-  const win={addEventListener:doc.addEventListener,removeEventListener:doc.removeEventListener}
+  const win={addEventListener:doc.addEventListener,removeEventListener:doc.removeEventListener,dispatchEvent:event=>{state.listeners.get(event.type)?.(event);return true}}
   const polling={exports:{}};vm.runInNewContext(transpile(fs.readFileSync(path.join(root,'src/utils/resource-monitor.ts'),'utf8')),{module:polling,exports:polling.exports,setTimeout:(fn,delay)=>{const id=++state.next;state.timers.set(id,{fn,delay});return id},clearTimeout:id=>state.timers.delete(id)})
-  const targets={exports:{}};vm.runInNewContext(transpile(fs.readFileSync(path.join(root,'src/utils/work-reminders.ts'),'utf8')),{module:targets,exports:targets.exports})
+  const targets={exports:{}};vm.runInNewContext(transpile(fs.readFileSync(path.join(root,'src/utils/work-reminders.ts'),'utf8')),{module:targets,exports:targets.exports,window:win,Event:class{constructor(type){this.type=type}}})
   const deps={vue:{ref:value=>({value}),computed:fn=>({get value(){return fn()}}),watch:(getter,fn,options)=>{state.watchers.push(fn);if(options?.immediate)fn()},onMounted:fn=>fn(),onBeforeUnmount:fn=>state.unmount.push(fn)},'element-plus':{ElMessage:{success(){},warning(){}}},'vue-router':{useRouter:()=>({push:target=>state.routes.push(target)})},'@element-plus/icons-vue':{},'@/stores/auth':{useAuthStore:()=>auth},'@/utils/request':{getAccessToken:()=>state.token},'@/utils/resource-monitor':polling.exports,'@/utils/work-reminders':{...targets.exports,WORK_REMINDERS_CHANGED:'changed'},'@/api/work-reminders':{workRemindersApi:{summary:()=>new Promise((resolve,reject)=>state.calls.push({resolve,reject})),read:revisions=>new Promise((resolve,reject)=>state.reads.push({resolve,reject,revisions}))}}}
   const source=parse(fs.readFileSync(path.join(root,'src/components/WorkReminders.vue'),'utf8')).descriptor.scriptSetup.content
   const module={exports:{}};vm.runInNewContext(transpile(source+'\nmodule.exports={summary,hasMessages,available,visible,loading,error,ready,open,refresh,markRead,reading};'),{module,exports:module.exports,document:doc,window:win,require:name=>{assert.ok(deps[name],name);return deps[name]}})
-  return {...module.exports,state,auth,doc,dispose(){state.unmount.forEach(fn=>fn())}}
+  return {...module.exports,state,auth,doc,win,workReminders:targets.exports,dispose(){state.unmount.forEach(fn=>fn())}}
+}
+
+function reportButton(p) {
+  const state={watchers:[],unmount:[]}
+  const deps={vue:{ref:value=>({value}),computed:get=>({get value(){return get()}}),watch:(getter,fn,options)=>{state.watchers.push(fn);if(options?.immediate)fn()},onMounted:fn=>fn(),onBeforeUnmount:fn=>state.unmount.push(fn)},
+    'vue-router':{useRouter:()=>({push:target=>p.state.routes.push(target)})},'@/stores/auth':{useAuthStore:()=>p.auth},'@/utils/request':{getAccessToken:()=>p.state.token},'@/utils/work-reminders':p.workReminders}
+  const source=parse(fs.readFileSync(path.join(root,'src/components/ReportManagementButton.vue'),'utf8')).descriptor.scriptSetup.content
+  const module={exports:{}}
+  vm.runInNewContext(transpile(source+'\nmodule.exports={pending,hasPending,available,openReports};'),{module,exports:module.exports,window:p.win,require:name=>{assert.ok(deps[name],name);return deps[name]}})
+  return{...module.exports,dispose(){state.unmount.forEach(fn=>fn())}}
 }
 const data={total:3,items:[{type:'REPORT',title:'新举报',count:2,latestAt:'2026-10-23T12:30:00'},{type:'FEEDBACK',title:'新反馈',count:1,latestAt:'2026-10-23T12:20:00'}]}
+
+test('文章页举报按钮复用顶部轮询，已读但未处理仍有红点，处理完成自动消除',async()=>{
+  const p=feed(),item={...data.items[0],pendingCount:2,revision:'d'.repeat(64)}
+  p.state.calls[0].resolve({total:2,items:[item]});await tick()
+  const button=reportButton(p)
+  assert.equal(button.hasPending.value,true)
+  assert.equal(button.pending.value,2)
+  assert.equal(p.state.calls.length,1,'按钮不额外查列表或汇总')
+  assert.equal(p.state.timers.size,1,'只有顶部的一套轮询')
+  button.openReports()
+  assert.equal(p.state.routes[0].path,'/content/community-reports')
+  assert.ok(p.state.routes[0].query.reminder)
+  const reading=p.markRead(item);p.state.reads[0].resolve();await reading
+  assert.equal(p.hasMessages.value,false)
+  assert.equal(button.hasPending.value,true,'已读不会漏掉待处理举报')
+  p.state.listeners.get('changed')()
+  p.state.calls.at(-1).resolve({total:2,items:[item]});await tick()
+  const queued=[...p.state.timers.values()].find(timer=>timer.delay===0)
+  assert.ok(queued);queued.fn()
+  p.state.calls.at(-1).resolve({total:0,items:[]});await tick()
+  assert.equal(button.hasPending.value,false)
+  button.dispose();p.dispose()
+})
+
+test('举报按钮实时显示新举报，换账号退出清理快照，旧请求不能恢复红点',async()=>{
+  const p=feed(),button=reportButton(p)
+  assert.equal(button.hasPending.value,false)
+  p.state.calls[0].resolve({total:1,items:[{...data.items[0],count:1,pendingCount:1}]});await tick()
+  assert.equal(button.hasPending.value,true)
+  p.refresh();const old=p.state.calls[1]
+  p.state.token='second';p.auth.account={id:2,permissions:['content:news:list']};p.state.watchers[0]()
+  assert.equal(button.hasPending.value,false)
+  old.resolve({total:9,items:[{...data.items[0],count:9,pendingCount:9}]});await tick()
+  assert.equal(button.hasPending.value,false)
+  p.state.calls[2].resolve({total:0,items:[]});await tick()
+  assert.equal(button.hasPending.value,false)
+  p.auth.account=null;p.auth.isLoggedIn=false;p.state.token='';p.state.watchers[0]()
+  assert.equal(button.available.value,false)
+  assert.equal(button.hasPending.value,false)
+  const routes=p.state.routes.length;button.openReports();assert.equal(p.state.routes.length,routes)
+  button.dispose();p.dispose();assert.equal(p.state.listeners.size,0)
+})
 
 test('管理员标记已读保留待办，作废在途旧统计，失败不消除红点',async()=>{
   const p=feed(),item={...data.items[0],revision:'a'.repeat(64),pendingCount:2}
@@ -84,8 +136,11 @@ test('反馈提醒重置旧筛选和页码，处理成功刷新顶部消息',asy
   let script=parse(fs.readFileSync(path.join(root,'src/views/users/FeedbackView.vue'),'utf8')).descriptor.scriptSetup.content
   const calls=[],route={query:{reminder:'1'}},watchers=[]
   const deps={vue:{ref:value=>({value}),reactive:value=>value,watch:(getter,fn,options)=>{watchers.push(fn);if(options?.immediate)fn(getter())}},'vue-router':{useRoute:()=>route},'element-plus':{ElMessage:{success(){},error(){},warning(){}}},'@element-plus/icons-vue':{},'@/api':{api:{pageFeedback(){},replyFeedback:async()=>calls.push('reply')}},'@/components/TablePagination.vue':{},'@/composables/useServerPagination':{useServerPagination:()=>({page:{pageNum:1,pageSize:10},records:{value:[]},loading:{value:false},pageSummary:{value:''},load:async()=>calls.push('load'),search:async filters=>calls.push({...filters})})},'@/stores/auth':{useAuthStore:()=>({account:null})},'@/utils/work-reminders':{refreshWorkReminders:()=>calls.push('refresh')}}
+  deps.vue.onBeforeUnmount=()=>{}
+  deps['@/utils/request']={getAccessToken:()=> 'feedback-test-token'}
+  deps['@/api'].api.feedbackTypeOptions=async()=>[{id:5,name:'设备支持',deviceRelated:true}]
   const module={exports:{}};vm.runInNewContext(transpile(script+'\nmodule.exports={q,dialog,form,saveReply};'),{module,exports:module.exports,require:name=>{assert.ok(deps[name],name);return deps[name]}})
-  assert.equal(calls[0].replyStatus,0);const p=module.exports;p.q.keyword='旧词';p.q.type='产品建议';p.q.status='done';watchers[0]('2');assert.equal(p.q.keyword,'');assert.equal(p.q.status,'received');assert.equal(calls[1].feedbackType,undefined);assert.equal(calls[1].replyStatus,0)
+  assert.equal(calls[0].replyStatus,0);const p=module.exports;p.q.keyword='旧词';p.q.type=1;p.q.status='done';watchers[0]('2');assert.equal(p.q.keyword,'');assert.equal(p.q.status,'received');assert.equal(calls[1].feedbackType,undefined);assert.equal(calls[1].replyStatus,0)
   p.dialog.row={id:1};p.form.status='done';p.form.reply='感谢反馈';await p.saveReply();assert.deepEqual(calls.slice(-3),['reply','refresh','load'])
 })
 

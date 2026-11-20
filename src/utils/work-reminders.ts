@@ -1,6 +1,26 @@
-import type { WorkReminderType } from '@/api/work-reminders'
+import type { WorkReminderSummary, WorkReminderType } from '@/api/work-reminders'
 
 export const WORK_REMINDERS_CHANGED = 'glucopilot:work-reminders-changed'
+export const WORK_REMINDERS_UPDATED = 'glucopilot:work-reminders-updated'
+let reportSnapshot: { accountId: number | null; token: string; pending: number } | null = null
+
+// 复用顶部信封的轮询结果，文章页不另起一套查询或定时器。
+export function publishWorkReminderSummary(accountId: number | null | undefined, token: string, summary: WorkReminderSummary) {
+  const report = summary.items.find(item => item.type === 'REPORT')
+  const count = Number(report?.pendingCount ?? report?.count ?? 0)
+  reportSnapshot = {
+    accountId: accountId ?? null,
+    token,
+    pending: Number.isSafeInteger(count) && count > 0 ? count : 0
+  }
+  window.dispatchEvent(new Event(WORK_REMINDERS_UPDATED))
+}
+
+export function pendingReportCount(accountId: number | null | undefined, token: string) {
+  return accountId != null && !!token && reportSnapshot?.accountId === accountId && reportSnapshot.token === token
+    ? reportSnapshot.pending : 0
+}
+
 export function refreshWorkReminders() {
   window.dispatchEvent(new Event(WORK_REMINDERS_CHANGED))
 }

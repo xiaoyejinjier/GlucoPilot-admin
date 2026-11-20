@@ -2,13 +2,13 @@
   <div class="page-wrap paginated-page">
     <div class="head">
       <h2 class="page-title">反馈管理</h2>
-      <el-button :icon="Refresh" @click="load">刷新</el-button>
+      <el-button :icon="Refresh" @click="refresh">刷新</el-button>
     </div>
 
     <div class="kt-card paginated-card">
       <div class="filter mb12">
         <el-select v-model="q.type" placeholder="反馈类型" clearable style="width: 150px" @change="search">
-          <el-option v-for="t in types" :key="t" :label="t" :value="t" />
+          <el-option v-for="t in types" :key="t.id" :label="t.name" :value="t.id" />
         </el-select>
         <el-select v-model="q.status" placeholder="处理状态" clearable style="width: 150px" @change="search">
           <el-option label="待审批" value="received" />
@@ -18,6 +18,7 @@
         <el-button type="primary" @click="search">查询</el-button>
         <el-button @click="reset">重置</el-button>
         <span class="text-muted" style="font-size: 12px">提交回复后自动标为已完成</span>
+        <el-button v-if="typesError" link type="danger" @click="loadTypes">类型加载失败，重试</el-button>
       </div>
 
       <el-table :data="list" v-loading="loading" row-key="id" height="100%" class="paginated-table">
@@ -31,6 +32,9 @@
           <template #default="{ row }"><el-tag size="small" effect="plain">{{ row.type }}</el-tag></template>
         </el-table-column>
         <el-table-column prop="content" label="反馈内容" min-width="280" show-overflow-tooltip />
+        <el-table-column prop="deviceDescription" label="设备信息" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.deviceDescription || '—' }}</template>
+        </el-table-column>
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag size="small" :type="statusType(row.status)">{{ statusText(row.status) }}</el-tag>
@@ -59,6 +63,7 @@
         <div class="kt-card mb12" style="background: #fafafa">
           <div class="text-muted" style="font-size: 13px">{{ dialog.row.userName }} · {{ dialog.row.type }} · {{ dialog.row.createdAt }}</div>
           <p style="margin: 8px 0 0">{{ dialog.row.content }}</p>
+          <p v-if="dialog.row.deviceDescription" class="device-description">设备信息：{{ dialog.row.deviceDescription }}<span v-if="dialog.row.deviceId"> · 设备 #{{ dialog.row.deviceId }}</span></p>
           <div v-if="dialog.row.reply" style="margin-top: 8px; font-size: 13px" class="reply-pre">上次回复：{{ dialog.row.reply }}</div>
         </div>
         <el-form label-width="90px">
@@ -79,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Refresh, Search } from '@element-plus/icons-vue'
@@ -88,13 +93,28 @@ import TablePagination from '@/components/TablePagination.vue'
 import { useServerPagination } from '@/composables/useServerPagination'
 import { useAuthStore } from '@/stores/auth'
 import { refreshWorkReminders } from '@/utils/work-reminders'
-import type { Feedback, FeedbackStatus, FeedbackType } from '@/types'
+import type { Feedback, FeedbackStatus, FeedbackTypeOption } from '@/types'
+import { getAccessToken } from '@/utils/request'
 
 const auth = useAuthStore()
 const route = useRoute()
-const types: FeedbackType[] = ['产品建议', 'Bug问题', '功能诉求', '其他']
+const types = ref<FeedbackTypeOption[]>([])
+const typesError = ref(false)
+let alive = true, typesRun = 0
+async function loadTypes() {
+  const token = getAccessToken(), run = ++typesRun
+  typesError.value = false
+  try {
+    const rows = await api.feedbackTypeOptions()
+    if (alive && run === typesRun && token === getAccessToken()) types.value = rows
+  } catch {
+    if (alive && run === typesRun && token === getAccessToken()) typesError.value = true
+  }
+}
+onBeforeUnmount(() => { alive = false; typesRun++ })
+void loadTypes()
 const saving = ref(false)
-const q = reactive({ type: '' as FeedbackType | '', status: '' as FeedbackStatus | '', keyword: '' })
+const q = reactive({ type: '' as number | '', status: '' as FeedbackStatus | '', keyword: '' })
 type FeedbackFilters = { keyword?: string; feedbackType?: number; replyStatus?: number }
 const { page, records: list, loading, pageSummary, load, search: applyFilters, changeSize, changePage } =
   useServerPagination<Feedback, FeedbackFilters>(api.pageFeedback, {}, { errorMessage: '反馈加载失败' })
@@ -111,9 +131,18 @@ watch(() => route.query.reminder, value => {
 function search() {
   return applyFilters({
     keyword: q.keyword.trim() || undefined,
-    feedbackType: q.type ? types.indexOf(q.type) + 1 : undefined,
+    feedbackType: q.type || undefined,
     replyStatus: q.status ? ({ received: 0, done: 2 } as const)[q.status] : undefined
   })
+}
+
+async function refresh() {
+  await loadTypes()
+  if (!typesError.value && q.type && !types.value.some(type => type.id === q.type)) {
+    q.type = ''
+    return search()
+  }
+  return load()
 }
 
 function reset() {
@@ -163,4 +192,5 @@ async function saveReply() {
 .page-title { margin: 0; font-size: 18px; }
 .filter { display: flex; flex: none; flex-wrap: wrap; gap: 10px; align-items: center; }
 .reply-pre { color: var(--kt-muted); }
+.device-description { font-size: 13px; color: var(--kt-muted); overflow-wrap: anywhere; }
 </style>

@@ -34,7 +34,7 @@ import { Message, Warning, ChatLineSquare, Apple, ArrowRight, CircleCheck, First
 import { useAuthStore } from '@/stores/auth'
 import { getAccessToken } from '@/utils/request'
 import { createResourcePoller } from '@/utils/resource-monitor'
-import { WORK_REMINDERS_CHANGED, workReminderTarget } from '@/utils/work-reminders'
+import { WORK_REMINDERS_CHANGED, workReminderTarget, publishWorkReminderSummary } from '@/utils/work-reminders'
 import { workRemindersApi, type WorkReminder, type WorkReminderSummary } from '@/api/work-reminders'
 
 const auth = useAuthStore(), router = useRouter()
@@ -52,11 +52,12 @@ function reset() {
   readGeneration++; reading.value = false
   poller?.dispose(); poller = undefined
   summary.value = { total: 0, items: [] }; ready.value = false; error.value = ''; visible.value = false; loading.value = false
+  publishWorkReminderSummary(auth.account?.id, getAccessToken(), summary.value)
   if (!available.value) return
   const account = auth.account?.id, token = getAccessToken()
   const current = () => auth.account?.id === account && getAccessToken() === token && available.value
   poller = createResourcePoller(workRemindersApi.summary,
-    data => { if (current()) { summary.value = data; ready.value = true; error.value = '' } },
+    data => { if (current()) { summary.value = data; ready.value = true; error.value = ''; publishWorkReminderSummary(account, token, data) } },
     () => { if (current()) error.value = ready.value ? '更新失败，显示上次结果' : '消息加载失败' },
     value => { loading.value = value }, 5000)
   visibility()
@@ -78,6 +79,7 @@ async function markRead(item?: WorkReminder) {
     const kinds = new Set(selected.map(row => row.type))
     summary.value = { ...summary.value, items: summary.value.items.map(row => kinds.has(row.type) ? { ...row, count: 0 } : row) }
     summary.value.total = summary.value.items.reduce((total, row) => total + Number(row.count), 0)
+    publishWorkReminderSummary(account, token, summary.value)
     ElMessage.success('已标为已读，待办仍可继续处理')
   } catch (failure) {
     if (current()) ElMessage.warning(failure instanceof Error ? failure.message : '标记失败，请重试')
@@ -94,6 +96,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   readGeneration++
   poller?.dispose()
+  publishWorkReminderSummary(null, '', { total: 0, items: [] })
   document.removeEventListener('visibilitychange', visibility)
   window.removeEventListener('focus', refresh)
   window.removeEventListener(WORK_REMINDERS_CHANGED, changed)

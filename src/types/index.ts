@@ -207,14 +207,17 @@ export interface DeviceItem {
 }
 
 /* ------- 反馈 ------- */
-export type FeedbackType = '产品建议' | 'Bug问题' | '功能诉求' | '其他'
+export type FeedbackType = '产品建议' | 'Bug问题' | '功能诉求' | '其他' | '设备支持'
+export interface FeedbackTypeOption { id: number; name: string; deviceRelated: boolean }
 export type FeedbackStatus = 'received' | 'done'
 
 export interface Feedback {
   id: number
   userId: number
   userName: string
-  type: FeedbackType
+  type: string
+  deviceId?: string
+  deviceDescription?: string
   content: string
   contact: string
   status: FeedbackStatus

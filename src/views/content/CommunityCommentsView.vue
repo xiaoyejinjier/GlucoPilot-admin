@@ -6,7 +6,7 @@
         <p class="text-muted description">评论是先发后审：AI 判违规会立即隐藏并移出公开列表。运营也可以主动隐藏机器放行的内容，两种情况都能在这里恢复。</p>
       </div>
       <div class="heading-actions">
-        <el-button @click="router.push('/content/community')">返回文章管理</el-button>
+        <el-button @click="router.push('/content/community')"><NavigationArrow back />返回文章管理</el-button>
         <el-button v-if="articleId" @click="router.push('/content/community-comments')">查看全部评论</el-button>
         <el-button :icon="Refresh" :loading="loading" @click="load">刷新列表</el-button>
       </div>
@@ -93,6 +93,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
+import NavigationArrow from '@/components/NavigationArrow.vue'
 import { communityApi, type AdminComment } from '@/api/community'
 import { useAuthStore } from '@/stores/auth'
 import { getAccessToken } from '@/utils/request'

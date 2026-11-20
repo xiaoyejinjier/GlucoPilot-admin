@@ -520,9 +520,15 @@ export const api = {
     }
   },
   async listFeedback() { await delay(); return [...db.feedback].sort((a, b) => a.id - b.id) },
+  async feedbackTypeOptions() {
+    await delay()
+    return ['产品建议', 'Bug问题', '功能诉求', '其他', '设备支持']
+      .map((name, index) => ({ id: index + 1, name, deviceRelated: index === 4 }))
+      .sort((a, b) => (a.id === 5 ? 3.5 : a.id) - (b.id === 5 ? 3.5 : b.id))
+  },
   async pageFeedback(query: { pageNum: number; pageSize: number; keyword?: string; feedbackType?: number; replyStatus?: number }) {
     await delay()
-    const typeNames: Feedback['type'][] = ['产品建议', 'Bug问题', '功能诉求', '其他']
+    const typeNames: Feedback['type'][] = ['产品建议', 'Bug问题', '功能诉求', '其他', '设备支持']
     const statusCodes: Record<Feedback['status'], number> = { received: 0, done: 2 }
     const rows = [...db.feedback]
       .filter((item) => !query.keyword || item.content.includes(query.keyword) || item.userName.includes(query.keyword))

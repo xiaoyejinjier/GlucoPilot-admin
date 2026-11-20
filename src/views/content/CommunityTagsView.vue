@@ -1,6 +1,6 @@
 <template>
   <div class="page-wrap tag-management">
-    <div class="tag-page-heading"><div><h2 class="page-title">社区标签管理</h2><p>管理社区分类和发文标签，修改后小程序刷新即可同步。</p></div><div class="tag-page-actions"><router-link to="/content/community"><el-button>返回文章管理</el-button></router-link><el-button v-if="canManage" type="primary" @click="openEditor()">新增分类</el-button></div></div>
+    <div class="tag-page-heading"><div><h2 class="page-title">社区标签管理</h2><p>管理社区分类和发文标签，修改后小程序刷新即可同步。</p></div><div class="tag-page-actions"><router-link to="/content/community"><el-button><NavigationArrow back />返回文章管理</el-button></router-link><el-button v-if="canManage" type="primary" @click="openEditor()">新增分类</el-button></div></div>
     <el-alert title="用户自建标签归入“其他”；删除标签后用户不能再选择，已发布文章保留。" type="info" :closable="false" show-icon />
     <div class="kt-card tag-table-card">
       <div class="tag-filters">
@@ -39,6 +39,7 @@ import {ElMessage,ElMessageBox} from 'element-plus'
 import {communityTagsApi,type ManagedTag,type TagChange} from '@/api/community-tags'
 import {useAuthStore} from '@/stores/auth'
 import {getAccessToken} from '@/utils/request'
+import NavigationArrow from '@/components/NavigationArrow.vue'
 const auth=useAuthStore(),canManage=computed(()=>auth.hasPermission('content:news:edit'))
 const query=reactive({keyword:'',type:'',enabled:''}),rows=ref<ManagedTag[]>([]),pageNum=ref(1),total=ref(0),loading=ref(false),error=ref('')
 const editorOpen=ref(false),editing=ref<ManagedTag|null>(null),form=reactive<TagChange>({name:'',sortNo:10,enabled:1}),editorError=ref(''),saving=ref(false)

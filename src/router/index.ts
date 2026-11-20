@@ -39,7 +39,7 @@ export const routes: RouteRecordRaw[] = [
     children: [
       { path: 'dashboard', name: 'dashboard', component: () => import('@/views/dashboard/DashboardView.vue'), meta: { title: '数据看板', icon: 'DataBoard', roles: ['admin', 'editor'], permission: 'dashboard:view' } },
       { path: 'content/community', name: 'community-review', component: () => import('@/views/content/CommunityReviewView.vue'), meta: { title: '社区文章管理', breadcrumbTitle: '文章管理', icon: 'DocumentChecked', roles: ['admin', 'editor'], permission: 'content:news:list' } },
-      { path: 'content/community-reports', name: 'community-reports', component: () => import('@/views/content/CommunityReviewView.vue'), meta: { title: '社区举报管理', icon: 'Warning', roles: ['admin', 'editor'], permission: 'content:news:list' } },
+      { path: 'content/community-reports', name: 'community-reports', component: () => import('@/views/content/CommunityReviewView.vue'), meta: { title: '社区举报管理', breadcrumbTitle: '举报管理', icon: 'Warning', roles: ['admin', 'editor'], permission: 'content:news:list', hidden: true, activeMenu: '/content/community' } },
       { path: 'content/community-comments', name: 'community-comments', component: () => import('@/views/content/CommunityCommentsView.vue'), meta: { title: '社区评论管理', breadcrumbTitle: '评论管理', icon: 'ChatDotSquare', roles: ['admin', 'editor'], permission: 'content:news:list', hidden: true, activeMenu: '/content/community' } },
       { path: 'content/community-tags', name: 'community-tags', component: () => import('@/views/content/CommunityTagsView.vue'), meta: { title: '社区标签管理', breadcrumbTitle: '标签管理', icon: 'CollectionTag', roles: ['admin', 'editor'], permission: 'content:news:list', hidden: true, activeMenu: '/content/community' } },
       { path: 'content/news/new', name: 'news-new', component: () => import('@/views/content/NewsEditView.vue'), meta: { title: '新建官方文章', roles: ['admin', 'editor'], hidden: true, activeMenu: '/content/community', permission: 'content:news:edit' } },
@@ -117,7 +117,6 @@ export const menuGroups: MenuGroup[] = [
     title: '内容管理', icon: 'Document', roles: ['admin', 'editor'],
     children: [
       { path: '/content/community', title: '社区文章管理', icon: 'DocumentChecked', permission: 'content:news:list' },
-      { path: '/content/community-reports', title: '社区举报管理', icon: 'Warning', permission: 'content:news:list' },
       { path: '/content/media', title: '媒体素材', icon: 'FolderOpened', permission: 'content:media:manage' }
     ]
   },
