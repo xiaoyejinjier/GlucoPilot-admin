@@ -143,6 +143,7 @@
                 <span>第 {{ round.contextRound }} 轮</span>
                 <span class="text-muted">{{ round.modelCode || '—' }} · {{ round.totalTokens }} token</span>
                 <span v-if="round.triggerMsgId" class="text-muted">触发 #{{ round.triggerMsgId }}</span>
+                <span v-if="round.notice" class="round-notice">{{ round.notice }}</span>
               </div>
               <div v-if="round.shards.length" class="shard-bar">
                 <span
@@ -158,6 +159,11 @@
                 <span v-for="(shard, sIdx) in round.shards" :key="`legend-${round.contextRound}-${sIdx}`">
                   <i class="shard-dot" :class="`seg-${shard.contextType ?? 0}`" />
                   {{ shardLabel(shard) }} {{ shard.tokenEstimate ?? 0 }}
+                  <!-- 只有历史分片带窗口账本：滑动了的那一轮，正是命中率骤降的那一轮 -->
+                  <em v-if="shard.windowShifted === true" class="shard-flag">本轮滑动</em>
+                  <em v-if="shard.windowMessages != null" class="shard-flag shard-flag-quiet">
+                    历史 {{ shard.windowMessages }} 条
+                  </em>
                 </span>
               </div>
               <div v-else class="text-muted context-hint">这一轮没有分片记录</div>
@@ -525,6 +531,29 @@ function fullText(detail: AiChatMessageDetail): string {
 
 .shard-bar .shard-seg + .shard-seg {
   box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.55);
+}
+
+/* 后端拼好的一句话说明（如「本轮窗口已滑动 · 窗口 20 条上限」）：靠右、淡色，不与数字抢注意力 */
+.round-notice {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--el-color-warning);
+}
+
+/* 历史分片上的窗口账本标签：滑动用警示色，静态上限用灰色（只是背景信息） */
+.shard-flag {
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-style: normal;
+  color: var(--el-color-warning);
+  background: var(--el-color-warning-light-9);
+}
+
+.shard-flag-quiet {
+  color: var(--el-text-color-secondary);
+  background: var(--el-fill-color-light);
 }
 .shard-legend {
   display: flex;
