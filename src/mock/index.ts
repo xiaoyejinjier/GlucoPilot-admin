@@ -298,24 +298,29 @@ export const api = {
   /* 看板 */
   async dashboardStats(): Promise<DashboardStats> {
     await delay()
+    const today = new Date()
     const trend = Array.from({ length: 14 }, (_, i) => {
-      const idx = 14 - i
+      const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 13 + i)
       return {
-        date: date(Math.max(1, idx)),
+        date: `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`,
         glucose: 120 + ((i * 37) % 160),
         meal: 80 + ((i * 53) % 130),
         users: 3 + ((i * 11) % 26)
       }
     })
     return {
+      generatedAt: today.toISOString(),
+      rangeStart: trend[0].date,
+      rangeEnd: trend[13].date,
+      foodCount: db.foods.length,
       users: { total: db.users.length, today: 12, active: 186 },
       records: { todayGlucose: 328, todayMeal: 214, monthTotal: 8230 },
       content: { newsViews: db.news.reduce((s, n) => s + n.views, 0), newsCount: db.news.length, feedbackPending: db.feedback.filter((f) => f.status !== 'done').length },
       trend,
       complianceDist: [
-        { level: '达标(ok)', value: db.users.filter((u) => u.compliance >= 70).length },
-        { level: '偏高(warn)', value: db.users.filter((u) => u.compliance >= 40 && u.compliance < 70).length },
-        { level: '需关注(danger)', value: db.users.filter((u) => u.compliance < 40).length }
+        { level: '达标率≥70%', value: db.users.filter((u) => u.compliance >= 70).length },
+        { level: '达标率40%～<70%', value: db.users.filter((u) => u.compliance >= 40 && u.compliance < 70).length },
+        { level: '达标率<40%', value: db.users.filter((u) => u.compliance < 40).length }
       ],
       channelDist: CHANNELS.map((c, i) => ({ channel: c, value: 240 + i * 137 + ((i * 97) % 200) })),
       nodeHeat: [

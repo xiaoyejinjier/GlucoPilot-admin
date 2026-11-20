@@ -215,8 +215,8 @@ async function resolveReport() {
   catch (e) { ElMessage.error((e as Error).message || '处理失败，请重试') }
   finally { saving.value = false }
 }
-watch(reportMode, () => { ++detailRun; drawer.value = false; status.value = reportMode.value ? 'OPEN' : ''; source.value = ''; keyword.value = ''; pageNum.value = 1; total.value = 0; articles.value = []; reports.value = []; load() }, { immediate:true })
-watch(() => route.query.reminder, value => { if (value && reportMode.value) { drawer.value = false; status.value = 'OPEN'; source.value = ''; keyword.value = ''; search() } })
+watch(reportMode, () => { ++detailRun; drawer.value = false; status.value = reportMode.value ? 'OPEN' : route.query.state === 'PENDING_ADMIN' ? 'PENDING_ADMIN' : ''; source.value = ''; keyword.value = ''; pageNum.value = 1; total.value = 0; articles.value = []; reports.value = []; load() }, { immediate:true })
+watch(() => route.query.reminder, value => { if (value) { drawer.value = false; status.value = reportMode.value ? 'OPEN' : route.query.state === 'PENDING_ADMIN' ? 'PENDING_ADMIN' : ''; source.value = ''; keyword.value = ''; search() } })
 watch(drawer, visible => { if (!visible) ++detailRun })
 onBeforeUnmount(() => { ++listRun; ++detailRun })
 </script>

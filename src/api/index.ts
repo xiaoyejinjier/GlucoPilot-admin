@@ -6,7 +6,7 @@ import type {
   AiSceneSavePayload, AiUsageReport, AiChatSessionRow, AiChatMessageRow, AiChatMessageDetail,
   AiChatContextView, AiAuditToolCallRow, AiAuditMemoryRow, AiAuditSummaryRow, AiAuditOcrTaskRow,
 ModerationHitAuditRow, LocalizationAuditRow,
-  AppUser, Banner, DeviceItem, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
+  AppUser, Banner, DashboardStats, DeviceItem, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
   HealthArchive, MediaBizType, News, NineSlotResult, OpsAuditLogListData, OpsAuditLogPageResult,
   OpsAuditLogQuery, OpsAuditLogRawRow, OpsAuditLogRow, Role
 } from '@/types'
@@ -126,6 +126,25 @@ function mapFeedback(row: AdminFeedbackRow): Feedback {
 
 /** 真实后端 API（登录 + CMS + 营养库 + 运营账号 + 反馈闭环）；其余仍走 Mock */
 const remote = {
+  async dashboardStats(): Promise<DashboardStats> {
+    const row = await get<DashboardStats>('/admin/v1/dashboard')
+    const count = (value: unknown) => {
+      const parsed = Number(value)
+      if (!Number.isSafeInteger(parsed) || parsed < 0) throw new Error('看板统计数据格式异常，请刷新重试')
+      return parsed
+    }
+    return {
+      ...row,
+      foodCount: count(row.foodCount),
+      users: { total: count(row.users.total), today: count(row.users.today), active: count(row.users.active) },
+      records: { todayGlucose: count(row.records.todayGlucose), todayMeal: count(row.records.todayMeal), monthTotal: count(row.records.monthTotal) },
+      content: { newsCount: count(row.content.newsCount), newsViews: count(row.content.newsViews), feedbackPending: count(row.content.feedbackPending) },
+      trend: row.trend.map(point => ({ date: point.date, glucose: count(point.glucose), meal: count(point.meal), users: count(point.users) })),
+      complianceDist: row.complianceDist.map(item => ({ ...item, value: count(item.value) })),
+      channelDist: row.channelDist.map(item => ({ ...item, value: count(item.value) })),
+      nodeHeat: row.nodeHeat.map(item => ({ ...item, value: count(item.value) }))
+    }
+  },
   async listMedia() {
     return cmsMediaApi.list('all')
   },

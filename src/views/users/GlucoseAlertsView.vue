@@ -267,10 +267,11 @@ watch(owner, () => {
   saving.value = false; draftStorageFailed.value = false; draftRestored.value = false; conflictMessage.value = ''; detailError.value = ''
 }, { flush: 'sync' })
 watch(() => route.query.reminder, () => {
+  if (route.query.status === 'PENDING') { dates.value = defaultDates(); keyword.value = ''; alertType.value = ''; status.value = 'PENDING'; void search() }
   const id = String(route.query.recordId || '')
   if (/^[1-9]\d*$/.test(id)) void openDetail(id)
 })
-onMounted(() => { void load(); const id = String(route.query.recordId || drafts.active() || ''); if (/^[1-9]\d*$/.test(id)) void openDetail(id) })
+onMounted(() => { if (route.query.status === 'PENDING') { status.value = 'PENDING'; void search() } else void load(); const id = String(route.query.recordId || drafts.active() || ''); if (/^[1-9]\d*$/.test(id)) void openDetail(id) })
 onBeforeUnmount(() => { keepDraft(); alive = false; ++detailVersion })
 </script>
 

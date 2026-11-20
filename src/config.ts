@@ -4,6 +4,6 @@
 export const adminConfig = {
   /** 为空则用相对路径，由 vite proxy 转发到后端 */
   baseUrl: '',
-  /** true=全部 Mock；false=登录/资讯/Banner/营养库走真实接口 */
+  /** true=演示数据；false=已接入模块（含数据看板）使用真实接口 */
   useMock: false
 }

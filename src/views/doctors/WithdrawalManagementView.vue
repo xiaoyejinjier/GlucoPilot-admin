@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import {ref,onMounted,onBeforeUnmount} from 'vue'
+import {ref,onMounted,onBeforeUnmount,watch} from 'vue'
+import {useRoute} from 'vue-router'
+import {refreshWorkReminders} from '@/utils/work-reminders'
 import {ElMessage,ElMessageBox} from 'element-plus'
 import TablePagination from '@/components/TablePagination.vue'
 import {withdrawalApi,type Withdrawal,type WorkDay} from '@/api/withdrawals'
@@ -7,6 +9,7 @@ import {getAccessToken} from '@/utils/request'
 import {fmtTime} from '@/utils/format'
 import {withdrawalStatus} from '@/utils/withdrawal'
 const labels:Record<string,string>={PENDING:'待审核',APPROVED:'待发放',REJECTED:'已拒绝',COMPLETED:'已模拟发放'}
+const route=useRoute()
 const rows=ref<Withdrawal[]>([]),status=ref('PENDING'),loading=ref(false),error=ref(''),pageNum=ref(1),pageSize=ref(10),total=ref(0)
 const selected=ref<Withdrawal|null>(null),visible=ref(false),decision=ref('APPROVED'),note=ref(''),saving=ref(false)
 const calendarOpen=ref(false),calendarDate=ref(''),working=ref(false),calendarNote=ref(''),days=ref<WorkDay[]>([]),calendarSaving=ref(false)
@@ -20,7 +23,7 @@ async function load(){const token=getAccessToken(),run=++epoch;loading.value=tru
 function open(row:Withdrawal){selected.value={...row};decision.value='APPROVED';note.value='';visible.value=true}
 async function review(){if(!selected.value||saving.value||scopeToken!==getAccessToken())return;if(!note.value.trim()){ElMessage.warning('请填写审核意见');return}
  const token=getAccessToken();saving.value=true
- try{await withdrawalApi.review(selected.value,decision.value,note.value.trim());if(!valid(token))return;visible.value=false;ElMessage.success('审核已保存');await load()}
+ try{await withdrawalApi.review(selected.value,decision.value,note.value.trim());if(!valid(token))return;visible.value=false;ElMessage.success('审核已保存');refreshWorkReminders();await load()}
  catch(e){if(valid(token))ElMessage.error((e as Error).message)}finally{if(valid(token))saving.value=false}}
 async function payout(row:Withdrawal){if(saving.value)return;const token=getAccessToken()
  try{await ElMessageBox.confirm('向该订单绑定的支付宝沙箱账号转账测试资金。未到预计发放日期不能执行。','确认沙箱转账')}catch{return}
@@ -34,6 +37,7 @@ async function openCalendar(){calendarOpen.value=true;const token=getAccessToken
 async function saveDay(){if(!calendarDate.value||calendarSaving.value)return;const token=getAccessToken();calendarSaving.value=true
  try{await withdrawalApi.saveDay(calendarDate.value,working.value,calendarNote.value);if(!valid(token))return;ElMessage.success('工作日设置已保存');await openCalendar()}
  catch(e){if(valid(token))ElMessage.error((e as Error).message)}finally{if(valid(token))calendarSaving.value=false}}
+watch(()=>route.query.reminder,value=>{if(value){visible.value=false;status.value='PENDING';pageNum.value=1;void load()}})
 onMounted(load);onBeforeUnmount(()=>{alive=false;epoch++;rows.value=[];selected.value=null})
 </script>
 <template>

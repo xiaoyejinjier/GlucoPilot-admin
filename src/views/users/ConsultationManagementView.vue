@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { refreshWorkReminders } from '@/utils/work-reminders'
 import { ElMessage } from 'element-plus'
 import { consultationApi, type DoctorProfile } from '@/api/consultations'
 import { getAccessToken } from '@/utils/request'
@@ -10,6 +12,7 @@ const status = ref('PENDING'), pageNum = ref(1), pageSize = ref(10), total = ref
 const records = ref<DoctorProfile[]>([]), loading = ref(false), saving = ref(false)
 const visible = ref(false), selected = ref<DoctorProfile | null>(null), decision = ref('APPROVED'), note = ref('')
 const error = ref(''), stale = ref(false)
+const route = useRoute()
 let alive = true, epoch = 0
 async function load() {
   const run = ++epoch, token = getAccessToken()
@@ -34,7 +37,7 @@ async function submit() {
   try {
     await consultationApi.review(profile, decision.value, note.value.trim())
     if (!alive || token !== getAccessToken()) return
-    visible.value = false; ElMessage.success('审核已保存'); await load()
+    visible.value = false; ElMessage.success('审核已保存'); refreshWorkReminders(); await load()
   } catch (e) {
     if (!alive || token !== getAccessToken()) return
     ElMessage.error((e as Error).message)
@@ -42,6 +45,8 @@ async function submit() {
   } finally { if (alive && token === getAccessToken()) saving.value = false }
 }
 function filter() { pageNum.value = 1; load() }
+function reminder() { visible.value = false; status.value = 'PENDING'; pageNum.value = 1; void load() }
+watch(() => route.query.reminder, value => { if (value) reminder() })
 onMounted(load)
 onBeforeUnmount(() => { alive = false; epoch++; selected.value = null; records.value = [] })
 </script>

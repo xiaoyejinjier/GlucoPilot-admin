@@ -99,3 +99,22 @@ test('只有食品管理权限也显示信封，待审核食品亮红点并跳�
   p.state.listeners.get('changed')();p.state.calls[2].resolve({total:0,items:[]});await tick();assert.equal(p.hasMessages.value,false)
   p.dispose()
 })
+
+test('仅医生或提现审核权限也显示消息，新待办跳转正确审核入口',async()=>{
+  for(const [permission,type,path] of [['doctor:review:manage','DOCTOR_REVIEW','/doctor-management/reviews'],['doctor:withdrawal:manage','WITHDRAWAL_REVIEW','/doctor-management/withdrawals']]){
+    const p=feed();p.auth.account={id:8,permissions:[permission]};p.state.token='review';p.state.watchers[0]()
+    assert.equal(p.available.value,true)
+    p.state.calls[1].resolve({total:1,items:[{type,title:'待审核',count:1}]});await tick()
+    assert.equal(p.hasMessages.value,true);p.open(p.summary.value.items[0]);assert.equal(p.state.routes[0].path,path);assert.equal(p.state.routes[0].query.status,'PENDING');p.dispose()
+  }
+})
+
+test('八类待办支持全部已读，文章终审和异常事件可准确定位',async()=>{
+  const p=feed(),types=['REPORT','FEEDBACK','FOOD_REVIEW','GLUCOSE_UPDATE','DOCTOR_REVIEW','WITHDRAWAL_REVIEW','ARTICLE_REVIEW','GLUCOSE_PENDING']
+  const items=types.map(type=>({type,title:type,count:1,pendingCount:1,revision:'c'.repeat(64),recordId:'10'}))
+  p.state.calls[0].resolve({total:8,items});await tick()
+  p.open(items[6]);assert.equal(p.state.routes[0].path,'/content/community');assert.equal(p.state.routes[0].query.state,'PENDING_ADMIN')
+  p.open(items[7]);assert.equal(p.state.routes[1].path,'/user-service/glucose-alerts');assert.equal(p.state.routes[1].query.recordId,'10')
+  const saving=p.markRead();assert.equal(Object.keys(p.state.reads[0].revisions).length,8);p.state.reads[0].resolve();await saving
+  assert.equal(p.summary.value.total,0);assert.ok(p.summary.value.items.every(item=>item.pendingCount===1));p.dispose()
+})

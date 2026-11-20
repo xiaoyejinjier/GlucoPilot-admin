@@ -678,6 +678,10 @@ export interface OpsAuditLogQuery {
 
 /* 看板统计 */
 export interface DashboardStats {
+  generatedAt: string
+  rangeStart: string
+  rangeEnd: string
+  foodCount: number
   users: { total: number; today: number; active: number }
   records: { todayGlucose: number; todayMeal: number; monthTotal: number }
   content: { newsViews: number; newsCount: number; feedbackPending: number }
