@@ -195,15 +195,49 @@ export interface FoodItem {
 
 
 /* ------- 设备档案 ------- */
+export type DeviceSyncHealth = 'OK' | 'NEVER' | 'STALE'
+
+export type DeviceCategory =
+  | 'CGM' | 'BGM' | 'PUMP' | 'PEN' | 'BAND' | 'WATCH' | 'RING'
+  | 'HUB' | 'SCALE' | 'BP' | 'OXIMETER' | 'OTHER' | ''
+
 export interface DeviceItem {
   id: number
   deviceSn: string
   deviceName: string
   provider: string
+  deviceCategory?: DeviceCategory | string
+  deviceModel?: string
   userId: string
   userMasked: string
   deviceStatus: number
   lastSyncAt: string
+  createdAt?: string
+  cloudLinked?: boolean
+  syncHealth?: DeviceSyncHealth | string
+}
+
+export interface DeviceSyncLogItem {
+  id: string
+  provider: string
+  sampleCount: number
+  createdCount: number
+  remark: string
+  syncedAt: string
+}
+
+export interface DeviceCloudAuthStatus {
+  linked: boolean
+  expiresAt?: string
+  scopes?: string
+  vendorSubjectMasked?: string
+}
+
+export interface DevicePageResult {
+  records: DeviceItem[]
+  total: number
+  pageNum: number
+  pageSize: number
 }
 
 /* ------- 反馈 ------- */

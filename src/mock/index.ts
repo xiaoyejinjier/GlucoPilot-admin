@@ -479,9 +479,12 @@ export const api = {
     if (u) { u.status = enabled ? 'enabled' : 'disabled'; persist() }
   },
 
-  async listDevices(_params?: { keyword?: string; deviceStatus?: number }) {
+  async listDevices(params?: {
+    keyword?: string; deviceStatus?: number; provider?: string; deviceCategory?: string;
+    bound?: boolean; cloudLinked?: boolean; pageNum?: number; pageSize?: number
+  }): Promise<import('@/types').DevicePageResult> {
     await delay()
-    return [] as import('@/types').DeviceItem[]
+    return { records: [], total: 0, pageNum: params?.pageNum || 1, pageSize: params?.pageSize || 20 }
   },
   async saveDevice(d: import('@/types').DeviceItem) {
     await delay()
@@ -489,6 +492,17 @@ export const api = {
   },
   async toggleDeviceStatus(_id: number, _deviceStatus: number) { await delay() },
   async removeDevice(_id: number) { await delay() },
+  async fetchDeviceSyncLogs(_id: number, _limit = 20): Promise<import('@/types').DeviceSyncLogItem[]> {
+    await delay()
+    return []
+  },
+  async fetchDeviceCloudAuth(_id: number): Promise<import('@/types').DeviceCloudAuthStatus> {
+    await delay()
+    return { linked: false }
+  },
+  async revokeDeviceCloudAuth(_id: number): Promise<void> {
+    throw new Error('Mock模式不支持真实设备云授权操作，请连接后端')
+  },
   async archiveOf(userId: number): Promise<HealthArchive> {
     await delay(300)
     const u = db.users.find((x) => x.id === userId)

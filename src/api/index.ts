@@ -6,7 +6,8 @@ import type {
   AiSceneSavePayload, AiUsageReport, AiChatSessionRow, AiChatMessageRow, AiChatMessageDetail,
   AiChatContextView, AiAuditToolCallRow, AiAuditMemoryRow, AiAuditSummaryRow, AiAuditOcrTaskRow,
 ModerationHitAuditRow, LocalizationAuditRow,
-  AppUser, Banner, DashboardStats, DeviceItem, Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
+  AppUser, Banner, DashboardStats, DeviceCloudAuthStatus, DeviceItem, DevicePageResult, DeviceSyncLogItem,
+  Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
   HealthArchive, MediaBizType, News, NineSlotResult, OpsAuditLogListData, OpsAuditLogPageResult,
   OpsAuditLogQuery, OpsAuditLogRawRow, OpsAuditLogRow, Role
 } from '@/types'
@@ -316,39 +317,75 @@ const remote = {
     await put(`/admin/v1/users/${id}/status`, { accountStatus: enabled ? 1 : 0 })
   },
 
-  async listDevices(params?: { keyword?: string; deviceStatus?: number }) {
-    const q = new URLSearchParams({ pageNum: '1', pageSize: '100' })
-    if (params?.keyword) q.set('keyword', params.keyword)
-    if (params?.deviceStatus !== undefined && params.deviceStatus !== null) {
-      q.set('deviceStatus', String(params.deviceStatus))
-    }
+  async listDevices(params?: {
+    keyword?: string
+    deviceStatus?: number
+    provider?: string
+    deviceCategory?: string
+    bound?: boolean
+    cloudLinked?: boolean
+    pageNum?: number
+    pageSize?: number
+  }): Promise<DevicePageResult> {
     const page = await get<PageData<{
       id: string
       deviceSn: string
       deviceName: string
       provider: string
+      deviceCategory?: string | null
+      deviceModel?: string | null
       userId?: string | null
       userMasked?: string | null
       deviceStatus: number
       lastSyncAt?: string | null
-    }>>(`/admin/v1/devices?${q.toString()}`)
-    return (page.records || []).map((row) => ({
-      id: Number(row.id),
-      deviceSn: row.deviceSn || '',
-      deviceName: row.deviceName || '',
-      provider: row.provider || 'MOCK',
-      userId: row.userId ? String(row.userId) : '',
-      userMasked: row.userMasked || '未绑定',
-      deviceStatus: Number(row.deviceStatus) === 1 ? 1 : 0,
-      lastSyncAt: row.lastSyncAt ? fmtTime(row.lastSyncAt) : ''
-    }) as DeviceItem)
+      createdAt?: string | null
+      cloudLinked?: boolean | null
+      syncHealth?: string | null
+    }>>(`/admin/v1/devices?${queryString({
+      pageNum: params?.pageNum ?? 1,
+      pageSize: params?.pageSize ?? 20,
+      keyword: params?.keyword,
+      deviceStatus: params?.deviceStatus,
+      provider: params?.provider,
+      deviceCategory: params?.deviceCategory,
+      bound: params?.bound,
+      cloudLinked: params?.cloudLinked
+    })}`)
+    return {
+      pageNum: page.pageNum,
+      pageSize: page.pageSize,
+      total: page.total,
+      records: (page.records || []).map((row) => ({
+        id: Number(row.id),
+        deviceSn: row.deviceSn || '',
+        deviceName: row.deviceName || '',
+        provider: row.provider || 'MOCK',
+        deviceCategory: row.deviceCategory || '',
+        deviceModel: row.deviceModel || '',
+        userId: row.userId ? String(row.userId) : '',
+        userMasked: row.userMasked || '未绑定',
+        deviceStatus: Number(row.deviceStatus) === 1 ? 1 : 0,
+        lastSyncAt: row.lastSyncAt ? fmtTime(row.lastSyncAt) : '',
+        createdAt: row.createdAt ? fmtTime(row.createdAt) : '',
+        cloudLinked: row.cloudLinked === true,
+        syncHealth: row.syncHealth || (row.lastSyncAt ? 'OK' : 'NEVER')
+      }) as DeviceItem)
+    }
   },
   async saveDevice(d: DeviceItem) {
     const userId = d.userId && String(d.userId).trim() ? Number(d.userId) : null
+    const deviceCategory = d.deviceCategory && String(d.deviceCategory).trim()
+      ? String(d.deviceCategory).trim()
+      : null
+    const deviceModel = d.deviceModel && String(d.deviceModel).trim()
+      ? String(d.deviceModel).trim()
+      : null
     if (d.id && Number(d.id) > 0) {
       await put(`/admin/v1/devices/${d.id}`, {
         deviceName: d.deviceName.trim(),
         provider: (d.provider || 'MOCK').trim(),
+        deviceCategory,
+        deviceModel,
         userId
       })
       return d
@@ -357,6 +394,8 @@ const remote = {
       deviceSn: d.deviceSn.trim(),
       deviceName: d.deviceName.trim(),
       provider: (d.provider || 'MOCK').trim(),
+      deviceCategory,
+      deviceModel,
       userId
     })
     return { ...d, id: Number(saved.id) } as DeviceItem
@@ -366,6 +405,41 @@ const remote = {
   },
   async removeDevice(id: number) {
     await del(`/admin/v1/devices/${id}`)
+  },
+  async fetchDeviceSyncLogs(id: number, limit = 20): Promise<DeviceSyncLogItem[]> {
+    const list = await get<Array<{
+      id: string
+      provider?: string
+      sampleCount?: number
+      createdCount?: number
+      remark?: string
+      syncedAt?: string | null
+    }>>(`/admin/v1/devices/${id}/sync-logs?limit=${limit}`)
+    return (list || []).map((row) => ({
+      id: String(row.id),
+      provider: row.provider || '',
+      sampleCount: row.sampleCount == null ? 0 : Number(row.sampleCount),
+      createdCount: row.createdCount == null ? 0 : Number(row.createdCount),
+      remark: row.remark || '',
+      syncedAt: row.syncedAt ? fmtTime(row.syncedAt) : '—'
+    }))
+  },
+  async fetchDeviceCloudAuth(id: number): Promise<DeviceCloudAuthStatus> {
+    const row = await get<{
+      linked?: boolean
+      expiresAt?: string | null
+      scopes?: string | null
+      vendorSubjectMasked?: string | null
+    }>(`/admin/v1/devices/${id}/cloud-auth`)
+    return {
+      linked: row?.linked === true,
+      expiresAt: row?.expiresAt ? fmtTime(row.expiresAt) : '',
+      scopes: row?.scopes || '',
+      vendorSubjectMasked: row?.vendorSubjectMasked || ''
+    }
+  },
+  async revokeDeviceCloudAuth(id: number) {
+    await del(`/admin/v1/devices/${id}/cloud-auth`)
   },
   async archiveOf(userId: number) {
     const a = await get<{
