@@ -853,6 +853,8 @@ export interface AiAuditMemoryRow {
   memoryKey: string
   memoryText: string
   sourceSessionId: number | null
+  /** 写入来源（V86）：EXPLICIT=用户当轮亲口 / BATCH=会话结束后模型抽取 / null=本列上线前的历史数据 */
+  writeSource: 'EXPLICIT' | 'BATCH' | null
   /** 0~100 */
   confidence: number
   /** 逻辑删除标记；只有 includeDeleted=1 的查询才会出现已删行 */

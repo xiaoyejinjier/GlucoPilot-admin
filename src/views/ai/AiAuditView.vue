@@ -115,6 +115,13 @@
             <el-table-column prop="memoryKey" label="记忆键" width="150" />
             <el-table-column prop="memoryText" label="内容" min-width="320" />
             <el-table-column prop="confidence" label="置信度" width="90" />
+            <el-table-column label="来源" width="110">
+              <template #default="{ row }">
+                <el-tag v-if="row.writeSource === 'EXPLICIT'" type="success" size="small">用户明说</el-tag>
+                <el-tag v-else-if="row.writeSource === 'BATCH'" type="warning" size="small">模型抽取</el-tag>
+                <span v-else>—</span>
+              </template>
+            </el-table-column>
             <el-table-column prop="sourceSessionId" label="来源会话" width="110">
               <template #default="{ row }">{{ row.sourceSessionId ?? '—' }}</template>
             </el-table-column>
