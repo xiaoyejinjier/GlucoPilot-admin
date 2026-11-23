@@ -70,8 +70,6 @@ export interface NineSlotRecord {
   remark: string | null
   foodsText: string | null
   carbsG: number | null
-  predictNow: number | null
-  predictSuggest: number | null
   recordedAt: string | null
 }
 

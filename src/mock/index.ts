@@ -260,8 +260,6 @@ function mockNineSlotRows(startDate: string, endDate: string): NineSlotDayRow[] 
           remark: glucoseValue === null ? null : (nodeIndex === 0 ? '晨起测量' : null),
           foodsText: node.meal && recorded ? ['燕麦、鸡蛋', '米饭、青菜、鸡胸肉', '杂粮饭、鱼肉'][nodeIndex === 1 ? 0 : nodeIndex === 4 ? 1 : 2] : null,
           carbsG: node.meal && recorded ? 38 + nodeIndex * 2 : null,
-          predictNow: node.meal && recorded ? 7.2 + nodeIndex / 10 : null,
-          predictSuggest: node.meal && recorded ? 6.8 + nodeIndex / 10 : null,
           recordedAt: recorded ? `${recordDate} ${nodeIndex < 3 ? '08' : nodeIndex < 6 ? '12' : '18'}:${d2(5 + nodeIndex * 3)}:00` : null
         }
       })
