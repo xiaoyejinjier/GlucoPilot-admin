@@ -57,7 +57,7 @@ export const routes: RouteRecordRaw[] = [
       { path: 'user-service/consultations', redirect: '/doctor-management/reviews' },
       { path: 'doctor-management/reviews', name: 'doctor-reviews', component: () => import('@/views/users/ConsultationManagementView.vue'), meta: { title: '医生审核', icon: 'DocumentChecked', permission: 'doctor:review:manage', adminOnly: true } },
       { path: 'doctor-management/accounts', name: 'doctor-accounts', component: () => import('@/views/doctors/DoctorAccountsView.vue'), meta: { title: '医生账号', icon: 'User', permission: 'doctor:account:manage', adminOnly: true } },
-      { path: 'doctor-management/withdrawals', name: 'doctor-withdrawals', component: () => import('@/views/doctors/WithdrawalManagementView.vue'), meta: { title: '提现审核', icon: 'Wallet', permission: 'doctor:withdrawal:manage', adminOnly: true } },
+      { path: 'doctor-management/withdrawals', name: 'doctor-withdrawals', component: () => import('@/views/doctors/WithdrawalManagementView.vue'), meta: { title: '提现审核', icon: 'Wallet', permission: 'doctor:withdrawal:manage', adminOnly: true, hidden: true, activeMenu: '/doctor-management/accounts' } },
       { path: 'doctor-management/workbench', name: 'doctor-workbench', component: () => import('@/views/doctors/DoctorPortalView.vue'), meta: { title: '接诊工作台', icon: 'Service', permission: 'doctor:workbench:view', doctorOnly: true } },
       { path: 'doctor-management/consultations', name: 'doctor-consultations', component: () => import('@/views/doctors/DoctorPortalView.vue'), meta: { title: '我的问诊', icon: 'ChatLineSquare', permission: 'doctor:consultation:manage', doctorOnly: true } },
       { path: 'doctor-management/income', name: 'doctor-income', component: () => import('@/views/doctors/DoctorPortalView.vue'), meta: { title: '我的收入', icon: 'Wallet', permission: 'doctor:income:view', doctorOnly: true } },
@@ -95,6 +95,7 @@ export const routes: RouteRecordRaw[] = [
 ]
 
 export interface MenuChild {
+  hideWhenPermission?: string
   doctorOnly?: boolean
   path: string
   title: string
@@ -140,7 +141,7 @@ export const menuGroups: MenuGroup[] = [
     children: [
       { path: '/doctor-management/reviews', title: '医生审核', icon: 'DocumentChecked', permission: 'doctor:review:manage', adminOnly: true },
       { path: '/doctor-management/accounts', title: '医生账号', icon: 'User', permission: 'doctor:account:manage', adminOnly: true },
-        { path: '/doctor-management/withdrawals', title: '提现审核', icon: 'Wallet', permission: 'doctor:withdrawal:manage', adminOnly: true },
+      { path: '/doctor-management/withdrawals', title: '提现审核', icon: 'Wallet', permission: 'doctor:withdrawal:manage', adminOnly: true, hideWhenPermission: 'doctor:account:manage' },
       { path: '/doctor-management/workbench', title: '接诊工作台', icon: 'Service', permission: 'doctor:workbench:view', doctorOnly: true },
       { path: '/doctor-management/consultations', title: '我的问诊', icon: 'ChatLineSquare', permission: 'doctor:consultation:manage', doctorOnly: true },
       { path: '/doctor-management/income', title: '我的收入', icon: 'Wallet', permission: 'doctor:income:view', doctorOnly: true }

@@ -3,7 +3,7 @@ export interface Withdrawal {orderNo:string;userId:string;doctorName?:string;amo
 export interface WithdrawalSummary {eligible:boolean;sandbox:boolean;availableCents:string|number;frozenCents:string|number;businessDays:number;calendarRule:string;transferEnabled:boolean}
 export interface WorkDay {calendar_date:string;working_day:number;note:string}
 export const withdrawalApi={
-  list:(pageNum:number,pageSize:number,status='')=>get<{records:Withdrawal[];total:string|number}>(`/admin/v1/doctor-withdrawals?pageNum=${pageNum}&pageSize=${pageSize}&status=${encodeURIComponent(status)}`),
+  list:(pageNum:number,pageSize:number,status='',userId?:string)=>get<{records:Withdrawal[];total:string|number}>(`/admin/v1/doctor-withdrawals?pageNum=${pageNum}&pageSize=${pageSize}&status=${encodeURIComponent(status)}${userId ? '&userId='+encodeURIComponent(userId) : ''}`),
   review:(order:Withdrawal,status:string,note:string)=>post<Withdrawal>(`/admin/v1/doctor-withdrawals/${encodeURIComponent(order.orderNo)}/review`,{status,note,version:order.version}),
   payout:(no:string)=>post<Withdrawal>(`/admin/v1/doctor-withdrawals/${encodeURIComponent(no)}/payout`,{},{timeout:60000}),
   refresh:(no:string)=>post<Withdrawal>(`/admin/v1/doctor-withdrawals/${encodeURIComponent(no)}/refresh`,{},{timeout:60000}),
