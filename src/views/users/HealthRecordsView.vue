@@ -40,7 +40,7 @@
         type="info"
         :closable="false"
         show-icon
-        title="餐点列展示 meal_record 饮食记录；血糖列展示 glucose_record 实测值。餐食预测仅作参考，不计入实测均值或达标率。"
+        title="餐点列展示 meal_record 饮食记录；血糖列展示 glucose_record 实测值。日均血糖与达标率仅统计实测血糖。"
       />
     </div>
 
@@ -142,7 +142,6 @@
                   <template v-if="node.meal">
                     <p>食物：{{ slotOf(row, node.code)?.foodsText || '未填写' }}</p>
                     <p>碳水：{{ valueText(slotOf(row, node.code)?.carbsG, 'g') }}</p>
-                    <p class="predict">餐食预测（非实测）：{{ valueText(slotOf(row, node.code)?.predictNow, 'mmol/L') }}</p>
                   </template>
                   <template v-else>
                     <p>血糖：{{ valueText(slotOf(row, node.code)?.glucoseValue, 'mmol/L') }}</p>
@@ -371,7 +370,6 @@ onMounted(load)
 .ellipsis { display: block; width: 104px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .not-recorded { color: #c0c4cc; }
 .popover-detail p { margin: 7px 0 0; line-height: 1.45; }
-.popover-detail .predict { color: #b36b12; }
 .popover-detail .recorded-time { white-space: nowrap; }
 @media (max-width: 1199px) {
   .chart-row .el-col + .el-col { margin-top: 16px; }
