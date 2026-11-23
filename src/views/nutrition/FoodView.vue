@@ -44,7 +44,7 @@
               </span>
             </div>
           </div>
-          <el-button class="all-btn" :class="{ 'all-active': filterCategory === 0 }" text size="small" @click="selectCategory(0)"
+          <el-button class="all-btn" :class="{ 'can-reset': filterCategory !== 0 }" text size="small" @click="selectCategory(0)"
             >查看全部食物</el-button
           >
         </div>
@@ -1197,7 +1197,7 @@ async function doImport() {
   color: #7c9182;
   background: #f6f8f7;
 }
-.all-btn.all-active { color: var(--kt-brand-dark); background: var(--kt-brand-soft); font-weight: 600; }
+.all-btn.can-reset { color: var(--kt-brand-dark); background: var(--kt-brand-soft); font-weight: 600; }
 .filter {
   display: flex;
   flex: none;

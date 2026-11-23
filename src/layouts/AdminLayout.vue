@@ -120,7 +120,11 @@ function changeTheme(id: ThemeId) {
   app.applyTheme()
 }
 
-const activePath = computed(() => route.meta.activeMenu || route.path)
+const activePath = computed(() => {
+  const parentPath=route.meta.activeMenu
+  const parent=parentPath&&router.resolve(parentPath).meta
+  return parentPath&&parent&&(!parent.permission||auth.hasPermission(parent.permission))?parentPath:route.path
+})
 
 function filterChildren(g: MenuGroup): MenuGroup {
   const role = auth.account?.role
@@ -128,6 +132,7 @@ function filterChildren(g: MenuGroup): MenuGroup {
     if (role === 'doctor') return doctorPageAllowed(auth.account, c.path)
     if (c.doctorOnly) return false
     if (c.adminOnly && role !== 'admin') return false
+    if (c.hideWhenPermission && auth.hasPermission(c.hideWhenPermission)) return false
     if (!adminConfig.useMock) return !c.permission || auth.hasPermission(c.permission)
     return !c.roles || !role || c.roles.includes(role)
   })
@@ -151,7 +156,7 @@ const breadcrumbs = computed(() => {
   const parentPath = route.meta.activeMenu
   if (parentPath && parentPath !== route.path && !items.some((m) => m.path === parentPath)) {
     const parent = [...router.resolve(parentPath).matched].reverse().find((m) => m.meta?.title)
-    if (parent) items.splice(Math.max(0, items.length - 1), 0, {
+    if (parent && (!parent.meta.permission || auth.hasPermission(parent.meta.permission))) items.splice(Math.max(0, items.length - 1), 0, {
       title: parent.meta.breadcrumbTitle || parent.meta.title as string,
       path: parentPath
     })
