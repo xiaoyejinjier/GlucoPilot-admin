@@ -9,8 +9,10 @@
       <div class="filter mb12">
         <el-input v-model="q.keyword" placeholder="用户名 / 昵称 / 手机号" clearable :prefix-icon="Search" style="width: 260px" @keyup.enter="search" @clear="search" />
         <el-select v-model="q.status" placeholder="状态" clearable style="width: 130px" @change="search">
-          <el-option label="正常" value="enabled" />
-          <el-option label="已禁用" value="disabled" />
+          <el-option label="正常" :value="1" />
+          <el-option label="已禁用" :value="0" />
+          <el-option label="注销中" :value="4" />
+          <el-option label="已注销" :value="3" />
         </el-select>
         <el-button type="primary" @click="search">查询</el-button>
         <el-button @click="reset">重置</el-button>
@@ -43,21 +45,43 @@
             <el-progress :percentage="row.compliance" :color="row.compliance >= 70 ? '#07c160' : row.compliance >= 40 ? '#fa9d3b' : '#fa5151'" :stroke-width="8" />
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="90">
+        <el-table-column label="状态" width="200">
           <template #default="{ row }">
-            <el-tag size="small" :type="row.status === 'enabled' ? 'success' : 'danger'" effect="light">
-              {{ row.status === 'enabled' ? '正常' : '禁用' }}
+            <el-tag size="small" :type="statusCell(row).tagType" effect="light">
+              {{ statusCell(row).label }}
             </el-tag>
+            <!-- 注销倒计时只用后端判定的 recoverable / overdue，不在前端推算 7 天窗口 -->
+            <div v-if="statusCell(row).note" class="status-note" :class="{ overdue: statusCell(row).overdue }">
+              {{ statusCell(row).note }}
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="registeredAt" label="注册时间" width="170" />
-        <el-table-column label="操作" :width="canViewMemory ? 270 : 180" fixed="right">
+        <el-table-column label="操作" :width="canViewMemory ? 300 : 220" fixed="right">
           <template #default="{ row }">
+            <!-- 详情对所有状态只读开放 -->
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-            <!-- 无 ai:memory:view 权限时整条入口不出现（不做禁用态） -->
-            <el-button v-if="canViewMemory" link type="primary" @click="openMemories(row)">AI 记忆</el-button>
-            <el-button v-if="row.status === 'enabled'" link type="danger" @click="toggle(row, false)">禁用</el-button>
-            <el-button v-else link type="success" @click="toggle(row, true)">解禁</el-button>
+
+            <!-- 注销中(4)：只给「取消注销」，不提供强制注销/清理，也不与禁用/解禁混用 -->
+            <template v-if="row.accountStatus === 4">
+              <el-button
+                v-if="canRecoverCancel"
+                link
+                type="warning"
+                :disabled="row.cancelRecoverable === false"
+                @click="recover(row)"
+              >取消注销</el-button>
+            </template>
+
+            <template v-else>
+              <!-- 无 ai:memory:view 权限时整条入口不出现（不做禁用态） -->
+              <el-button v-if="canViewMemory" link type="primary" @click="openMemories(row)">AI 记忆</el-button>
+              <!-- 只有 0/1 才允许禁用/解禁；2/3 已进入注销流程，后端也会 409 拒绝 -->
+              <template v-if="row.accountStatus === 0 || row.accountStatus === 1">
+                <el-button v-if="row.accountStatus === 1" link type="danger" @click="toggle(row, false)">禁用</el-button>
+                <el-button v-else link type="success" @click="toggle(row, true)">解禁</el-button>
+              </template>
+            </template>
           </template>
         </el-table-column>
       </el-table>
@@ -74,7 +98,7 @@
     <el-drawer v-model="detailVisible" title="用户详情" :size="560" destroy-on-close>
       <div v-loading="detailLoading" class="user-detail-content">
         <el-alert v-if="detailError" :title="detailError" type="error" :closable="false" show-icon />
-        <template v-if="detail"><div class="user-detail-heading"><el-avatar :size="56">{{detail.avatarText || '用'}}</el-avatar><div><h3>{{detail.nickname}}</h3></div><el-tag :type="detail.accountStatus===1?'success':'danger'">{{detail.accountStatus===1?'正常':'已禁用'}}</el-tag></div>
+        <template v-if="detail"><div class="user-detail-heading"><el-avatar :size="56">{{detail.avatarText || '用'}}</el-avatar><div><h3>{{detail.nickname}}</h3></div><el-tag :type="accountStatusMeta(detail.accountStatus).tagType">{{accountStatusMeta(detail.accountStatus).label}}</el-tag></div>
           <el-descriptions :column="1" border><el-descriptions-item label="用户名">{{detail.username || '未设置'}}</el-descriptions-item><el-descriptions-item label="手机号">{{detail.phone || '未绑定'}}</el-descriptions-item><el-descriptions-item label="年龄">{{detail.age == null ? '未填写' : detail.age+' 岁'}}</el-descriptions-item><el-descriptions-item label="糖尿病类型">{{detail.diabetesTypeText || '未填写'}}</el-descriptions-item><el-descriptions-item label="注册时间">{{detailDate(detail.registeredAt)}}</el-descriptions-item><el-descriptions-item label="最后活跃">{{detailDate(detail.lastActiveAt)}}</el-descriptions-item><el-descriptions-item label="血糖记录">{{detail.recordCount}} 条</el-descriptions-item><el-descriptions-item label="饮食记录">{{detail.mealCount}} 条</el-descriptions-item><el-descriptions-item label="达标率">{{detail.complianceRate}}%</el-descriptions-item></el-descriptions>
         </template>
       </div>
@@ -156,6 +180,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Search } from '@element-plus/icons-vue'
 import { aiMemoryApi, api } from '@/api'
 import TablePagination from '@/components/TablePagination.vue'
+import { useNow } from '@/composables/useNow'
 import { useServerPagination } from '@/composables/useServerPagination'
 import { useAuthStore } from '@/stores/auth'
 import { fmtTime } from '@/utils/format'
@@ -169,7 +194,7 @@ let detailRun=0,alive=true
 const detailDate=(value:string|null)=>value?value.replace('T',' ').slice(0,19):'未记录'
 async function openDetail(row:AppUser){const version=++detailRun,token=getAccessToken();detail.value=null;detailError.value='';detailVisible.value=true;detailLoading.value=true;try{const saved=await userDetailsApi.get(row.id);if(alive&&version===detailRun&&token===getAccessToken())detail.value=saved}catch(e){if(alive&&version===detailRun)detailError.value=(e as Error).message||'用户详情读取失败'}finally{if(alive&&version===detailRun)detailLoading.value=false}}
 onBeforeUnmount(()=>{alive=false;++detailRun})
-const q = reactive({ keyword: '', status: '' })
+const q = reactive<{ keyword: string; status: '' | number }>({ keyword: '', status: '' })
 type UserFilters = { keyword?: string; accountStatus?: number }
 const { page, records: users, loading, pageSummary, load, search: applyFilters, changeSize, changePage } =
   useServerPagination<AppUser, UserFilters>(api.pageUsers, {}, { errorMessage: '用户列表加载失败' })
@@ -178,6 +203,92 @@ onMounted(load)
 /** 后端读写分离：查看长期记忆要 ai:memory:view，清空要 ai:memory:manage。 */
 const canViewMemory = computed(() => auth.hasPermission('ai:memory:view'))
 const canManageMemory = computed(() => auth.hasPermission('ai:memory:manage'))
+/** 取消注销是独立权限点：默认只授予 super_admin，能看用户不等于能改注销状态。 */
+const canRecoverCancel = computed(() => auth.hasPermission('user:cancel:recover'))
+
+/* ---------------- 账号状态与注销倒计时 ---------------- */
+
+const now = useNow()
+const DAY_MS = 86_400_000
+type StatusTagType = 'success' | 'danger' | 'warning' | 'info'
+
+function accountStatusMeta(status?: number | null): { label: string; tagType: StatusTagType } {
+  switch (status) {
+    case 0:
+      return { label: '已禁用', tagType: 'danger' }
+    case 1:
+      return { label: '正常', tagType: 'success' }
+    case 3:
+      return { label: '已注销', tagType: 'info' }
+    case 4:
+      return { label: '注销中', tagType: 'warning' }
+    case 2:
+      return { label: '注销中(历史)', tagType: 'info' }
+    default:
+      return { label: '未知', tagType: 'info' }
+  }
+}
+
+/**
+ * 状态列渲染模型。倒计时以服务端字段为准：
+ * 是否超期看 cancelPurgeOverdue，是否还能恢复看 cancelRecoverable，
+ * 前端只负责把 epoch ms 换算成 X 天，不自行用申请时间 +7d 推算窗口。
+ */
+function statusCell(row: AppUser) {
+  const meta = accountStatusMeta(row.accountStatus)
+  if (row.accountStatus !== 4) {
+    return { ...meta, note: '', overdue: false }
+  }
+  const deadline = row.cancelDeadlineAt
+  if (!deadline) {
+    return { ...meta, note: '注销凭据缺失，待核对', overdue: true }
+  }
+  if (row.cancelPurgeOverdue) {
+    return { ...meta, note: '超期未清理 · 等待系统补跑', overdue: true }
+  }
+  if (row.cancelRecoverable === false) {
+    return { ...meta, note: '已过反悔期 · 等待系统清理', overdue: false }
+  }
+  const applyMs = row.cancelApplyTime ? new Date(row.cancelApplyTime.replace(' ', 'T')).getTime() : NaN
+  const elapsed = Number.isFinite(applyMs)
+    ? `已注销 ${Math.max(0, Math.floor((now.value - applyMs) / DAY_MS))} 天 · `
+    : ''
+  const remain = Math.max(0, Math.ceil((deadline - now.value) / DAY_MS))
+  return { ...meta, note: `${elapsed}剩 ${remain} 天`, overdue: false }
+}
+
+/** 管理员取消注销：二次确认 + 选填备注（≤200 字），备注只进审计。 */
+async function recover(row: AppUser) {
+  let remark = ''
+  try {
+    const { value } = await ElMessageBox.prompt(
+      `将把「${row.nickname}」（ID ${row.id}）恢复为「${row.recoverToStatus === 0 ? '已禁用' : '正常'}」。恢复后用户可重新登录，本次操作会写入审计日志。`,
+      '取消注销',
+      {
+        type: 'warning',
+        confirmButtonText: '确认恢复',
+        cancelButtonText: '取消',
+        inputType: 'textarea',
+        inputPlaceholder: '备注（选填，最多 200 字，仅记入审计）',
+        inputValidator: (input: string) => !input || input.length <= 200 || '备注不能超过 200 字'
+      }
+    )
+    remark = (value || '').trim()
+  } catch {
+    // 用户取消：不做任何操作
+    return
+  }
+  try {
+    await api.recoverUserCancellation(row.id, remark)
+    if (auth.account) api.writeLog(auth.account.username, auth.account.role, '用户', '取消注销', `${row.nickname}(${row.id})`)
+    ElMessage.success('已取消注销，账号已按注销前状态恢复')
+    await load()
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '取消注销失败，请刷新后重试')
+    // 409 说明状态已被并发登录恢复 / Worker 清理 / 已过反悔期，重拉拿最新状态，避免继续展示过期操作
+    await load()
+  }
+}
 
 /* ---------------- 「AI 记忆」抽屉 ---------------- */
 
@@ -260,7 +371,7 @@ async function removeAllMemories() {
 function search() {
   return applyFilters({
     keyword: q.keyword.trim() || undefined,
-    accountStatus: q.status ? (q.status === 'enabled' ? 1 : 0) : undefined
+    accountStatus: q.status === '' ? undefined : q.status
   })
 }
 
@@ -288,6 +399,8 @@ async function toggle(row: AppUser, enabled: boolean) {
 .filter { display: flex; flex: none; flex-wrap: wrap; gap: 10px; align-items: center; }
 .user-cell { display: flex; align-items: center; gap: 8px; }
 .avatar { background: var(--kt-brand); color: #fff; flex: none; }
+.status-note { margin-top: 4px; font-size: 12px; color: var(--kt-muted); line-height: 1.4; }
+.status-note.overdue { color: #fa5151; font-weight: 500; }
 .user-detail-content{padding:4px 0;min-height:220px}.user-detail-heading{display:flex;gap:16px;align-items:center;margin:0 0 28px}.user-detail-heading h3{margin:0 0 8px;font-size:21px}.user-detail-heading span{color:var(--kt-muted);font-size:13px}.user-detail-heading .el-tag{margin-left:auto}
 
 .memory-body { display: flex; flex-direction: column; }

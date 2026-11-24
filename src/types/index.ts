@@ -19,6 +19,10 @@ export interface AdminAccount {
 }
 
 /* ------- C 端用户（后台被管对象） ------- */
+
+/** 与后端 CodeEnum.AccountStatus 对齐：0 禁用 / 1 正常 / 2 历史中间态 / 3 已注销 / 4 注销中（可恢复）。 */
+export type AccountStatus = 0 | 1 | 2 | 3 | 4
+
 export interface AppUser {
   id: number
   username: string
@@ -27,12 +31,25 @@ export interface AppUser {
   phone: string
   age: number
   diabetesType: string
+  /** 兼容旧逻辑的派生值；状态展示与操作一律用 accountStatus */
   status: 'enabled' | 'disabled'
+  accountStatus: AccountStatus
   registeredAt: string
   lastActiveAt: string
   recordCount: number
   mealCount: number
   compliance: number // 血糖达标率 %
+
+  /* 注销相关（仅 accountStatus=4 且后端存在活跃凭据时有值；否则为 null） */
+  cancelApplyTime?: string | null
+  /** 可恢复截止时间 epoch ms（服务端判定，前端不自行推算） */
+  cancelDeadlineAt?: number | null
+  /** Worker 可清理时间 epoch ms */
+  cancelPurgeEligibleAt?: number | null
+  cancelRecoverable?: boolean
+  cancelPurgeOverdue?: boolean
+  /** 恢复后的账号状态：0 禁用 / 1 正常 */
+  recoverToStatus?: 0 | 1 | null
 }
 
 export interface ArchiveNodeStat {

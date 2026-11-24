@@ -6,7 +6,7 @@ import type {
   AiSceneSavePayload, AiUsageReport, AiChatSessionRow, AiChatMessageRow, AiChatMessageDetail,
   AiChatContextView, AiAuditToolCallRow, AiAuditMemoryRow, AiAuditSummaryRow, AiAuditOcrTaskRow,
 ModerationHitAuditRow, LocalizationAuditRow,
-  AppUser, Banner, DashboardStats, DeviceCloudAuthStatus, DeviceItem, DevicePageResult, DeviceSyncLogItem,
+  AccountStatus, AppUser, Banner, DashboardStats, DeviceCloudAuthStatus, DeviceItem, DevicePageResult, DeviceSyncLogItem,
   Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
   HealthArchive, MediaBizType, News, NineSlotResult, OpsAuditLogListData, OpsAuditLogPageResult,
   OpsAuditLogQuery, OpsAuditLogRawRow, OpsAuditLogRow, Role
@@ -68,6 +68,13 @@ interface AdminUserRow {
   recordCount: number
   mealCount: number
   complianceRate: number
+  /* 注销字段：仅 accountStatus=4 且存在活跃凭据时后端返回，其余为 null */
+  cancelApplyTime?: string | null
+  cancelDeadlineAt?: number | null
+  cancelPurgeEligibleAt?: number | null
+  cancelRecoverable?: boolean
+  cancelPurgeOverdue?: boolean
+  recoverToStatus?: number | null
 }
 
 const feedbackTypes: Record<number, FeedbackType> = {
@@ -105,12 +112,20 @@ function mapUser(row: AdminUserRow): AppUser {
     phone: row.phone || row.phoneMasked || '未绑定',
     age: Number(row.age) || 0,
     diabetesType: row.diabetesTypeText || '未填写',
+    // 注意：不能把 accountStatus !== 1 都折叠成 disabled，否则注销中(4)/已注销(3) 会被当成禁用并出现「解禁」
     status: Number(row.accountStatus) === 1 ? 'enabled' : 'disabled',
+    accountStatus: (Number(row.accountStatus) || 0) as AccountStatus,
     registeredAt: row.registeredAt ? fmtTime(row.registeredAt) : '',
     lastActiveAt: row.lastActiveAt ? fmtTime(row.lastActiveAt) : '',
     recordCount: Number(row.recordCount) || 0,
     mealCount: Number(row.mealCount) || 0,
-    compliance: Number(row.complianceRate) || 0
+    compliance: Number(row.complianceRate) || 0,
+    cancelApplyTime: row.cancelApplyTime ?? null,
+    cancelDeadlineAt: row.cancelDeadlineAt ?? null,
+    cancelPurgeEligibleAt: row.cancelPurgeEligibleAt ?? null,
+    cancelRecoverable: row.cancelRecoverable,
+    cancelPurgeOverdue: row.cancelPurgeOverdue,
+    recoverToStatus: (row.recoverToStatus ?? null) as 0 | 1 | null
   }
 }
 
@@ -315,6 +330,16 @@ const remote = {
   },
   async toggleUserStatus(id: number, enabled: boolean) {
     await put(`/admin/v1/users/${id}/status`, { accountStatus: enabled ? 1 : 0 })
+  },
+  /**
+   * 管理员取消注销：需要 user:cancel:recover 权限。
+   * 仅恢复，不做强制注销/清理；重复、并发、超过反悔期由后端返回 40900。
+   */
+  async recoverUserCancellation(id: number, remark?: string) {
+    return post<{ recovered: boolean; accountStatus: number; recoveredAt: string }>(
+      `/admin/v1/users/${id}/cancellation/recover`,
+      { remark: remark?.trim() || undefined }
+    )
   },
 
   async listDevices(params?: {

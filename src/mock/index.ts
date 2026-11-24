@@ -1,5 +1,5 @@
 import type {
-  AdminAccount, AppUser, Banner, DashboardStats, ExportTask, Feedback, FoodCategory, FoodItem,
+  AccountStatus, AdminAccount, AppUser, Banner, DashboardStats, ExportTask, Feedback, FoodCategory, FoodItem,
   HealthArchive, MediaFile, News, NineSlotDayRow, NineSlotRecord, NineSlotResult, OperationLog, Role, SysConfig
 } from '@/types'
 
@@ -53,6 +53,7 @@ function seed(): DBShape {
     const id = i + 1
     const names = ['吴先生', '李阿姨', '陈师傅', '王老师', '张叔', '刘姐', '赵同学', '孙女士', '周大爷', '郑大哥']
     const n = i % names.length
+    const accountStatus: AccountStatus = i % 23 === 0 ? 0 : 1
     return {
       id,
       username: `user_${1000 + i}`,
@@ -61,7 +62,8 @@ function seed(): DBShape {
       phone: `138${d2(i)}${String(1000 + i * 7).slice(0, 6)}`,
       age: 38 + ((i * 7) % 34),
       diabetesType: ['1 型糖尿病', '2 型糖尿病', '妊娠期高血糖', '糖耐量异常'][i % 4],
-      status: i % 23 === 0 ? 'disabled' : 'enabled',
+      status: accountStatus === 1 ? 'enabled' : 'disabled',
+      accountStatus,
       registeredAt: daysAgo((i * 3) % 60),
       lastActiveAt: daysAgo(i % 5),
       recordCount: 2 + ((i * 13) % 200),
@@ -183,7 +185,9 @@ function load(): DBShape {
       // 兼容新增 username 之前已经保存在浏览器里的旧 Mock 数据。
       merged.users = (merged.users || []).map((user) => ({
         ...user,
-        username: user.username || `user_${user.id}`
+        username: user.username || `user_${user.id}`,
+        // 兼容新增 accountStatus 之前保存在浏览器里的旧 Mock 数据
+        accountStatus: user.accountStatus ?? (user.status === 'enabled' ? 1 : 0)
       }))
       return merged
     }
@@ -412,7 +416,7 @@ export const api = {
     await delay()
     const rows = [...db.users]
       .filter((user) => !query.keyword || user.username.includes(query.keyword) || user.nickname.includes(query.keyword) || user.phone.includes(query.keyword))
-      .filter((user) => query.accountStatus === undefined || user.status === (query.accountStatus === 1 ? 'enabled' : 'disabled'))
+      .filter((user) => query.accountStatus === undefined || user.accountStatus === query.accountStatus)
       .sort((a, b) => b.id - a.id)
     return pageOf(rows, query.pageNum, query.pageSize)
   },
@@ -474,7 +478,24 @@ export const api = {
   async toggleUserStatus(id: number, enabled: boolean) {
     await delay()
     const u = db.users.find((x) => x.id === id)
-    if (u) { u.status = enabled ? 'enabled' : 'disabled'; persist() }
+    if (u) { u.status = enabled ? 'enabled' : 'disabled'; u.accountStatus = enabled ? 1 : 0; persist() }
+  },
+  /** Mock 仅用于联调演示：真实环境由后端 CAS + 审计控制，窗口外返回 409。 */
+  async recoverUserCancellation(id: number, _remark?: string) {
+    await delay()
+    const u = db.users.find((x) => x.id === id)
+    if (!u || u.accountStatus !== 4) throw { code: 40900, message: '该用户当前不在注销中状态' }
+    if (u.cancelRecoverable === false) throw { code: 40900, message: '注销申请已过反悔期，账号等待系统清理' }
+    const to = u.recoverToStatus ?? 1
+    u.accountStatus = to
+    u.status = to === 1 ? 'enabled' : 'disabled'
+    u.cancelApplyTime = null
+    u.cancelDeadlineAt = null
+    u.cancelPurgeEligibleAt = null
+    u.cancelRecoverable = undefined
+    u.cancelPurgeOverdue = undefined
+    persist()
+    return { recovered: true, accountStatus: to, recoveredAt: new Date().toISOString().slice(0, 19) }
   },
 
   async listDevices(params?: {
