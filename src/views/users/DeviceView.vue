@@ -104,10 +104,15 @@
     <el-dialog v-model="dialog.visible" :title="dialog.form.id ? '编辑设备' : '新增设备'" width="480px">
       <el-form :model="dialog.form" label-width="90px">
         <el-form-item label="序列号" required>
-          <el-input v-model="dialog.form.deviceSn" :disabled="!!dialog.form.id" placeholder="设备 SN" />
+          <el-input
+            v-model="dialog.form.deviceSn"
+            :disabled="!!dialog.form.id"
+            placeholder="设备 SN"
+            @change="maybeSuggestCategory"
+          />
         </el-form-item>
         <el-form-item label="名称" required>
-          <el-input v-model="dialog.form.deviceName" placeholder="设备名称" />
+          <el-input v-model="dialog.form.deviceName" placeholder="设备名称" @change="maybeSuggestCategory" />
         </el-form-item>
         <el-form-item label="厂商">
           <el-select v-model="dialog.form.provider" style="width: 100%">
@@ -115,12 +120,24 @@
           </el-select>
         </el-form-item>
         <el-form-item label="设备类型">
-          <el-select v-model="dialog.form.deviceCategory" clearable placeholder="可选" style="width: 100%">
+          <el-select
+            v-model="dialog.form.deviceCategory"
+            clearable
+            placeholder="可选，可按 SN/名称自动建议"
+            style="width: 100%"
+            @clear="categoryTouched = false"
+            @change="categoryTouched = true"
+          >
             <el-option v-for="c in categories" :key="c" :label="categoryLabel(c)" :value="c" />
           </el-select>
         </el-form-item>
         <el-form-item label="型号">
-          <el-input v-model="dialog.form.deviceModel" placeholder="型号 / SKU，可空" maxlength="64" />
+          <el-input
+            v-model="dialog.form.deviceModel"
+            placeholder="型号 / SKU，可空"
+            maxlength="64"
+            @change="maybeSuggestCategory"
+          />
         </el-form-item>
         <el-form-item label="绑定用户">
           <el-input v-model="dialog.form.userId" placeholder="C 端用户 ID，可空" />
@@ -132,7 +149,7 @@
       </template>
     </el-dialog>
 
-    <el-drawer v-model="detail.visible" title="设备详情" size="480px" destroy-on-close>
+    <el-drawer v-model="detail.visible" title="设备详情" size="640px" destroy-on-close>
       <template v-if="detail.row">
         <div class="detail-block">
           <div class="detail-title">档案</div>
@@ -170,8 +187,16 @@
         </div>
 
         <div class="detail-block">
-          <div class="detail-title">同步流水（近 20 次）</div>
-          <el-table :data="detail.logs" v-loading="detail.logsLoading" size="small" empty-text="暂无同步流水">
+          <div class="detail-title">同步流水（近 20 次，点击行查看血糖曲线）</div>
+          <el-table
+            :data="detail.logs"
+            v-loading="detail.logsLoading"
+            size="small"
+            empty-text="暂无同步流水"
+            highlight-current-row
+            :row-class-name="syncRowClass"
+            @row-click="onSyncRowClick"
+          >
             <el-table-column prop="syncedAt" label="时间" width="150" />
             <el-table-column prop="provider" label="厂商" width="90" />
             <el-table-column prop="sampleCount" label="样本" width="60" />
@@ -179,18 +204,32 @@
             <el-table-column prop="remark" label="备注" min-width="100" show-overflow-tooltip />
           </el-table>
         </div>
+
+        <div v-if="detail.selectedLogId" class="detail-block">
+          <div class="detail-title">
+            同步血糖（只读）
+            <span class="detail-sub">{{ detail.samples?.syncedAt || '' }}</span>
+          </div>
+          <div v-loading="detail.samplesLoading">
+            <EChart v-if="sampleChartOption" :option="sampleChartOption" height="260px" />
+            <div v-else class="detail-empty">该次同步无样本快照（历史流水不回填）</div>
+          </div>
+        </div>
       </template>
     </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
+import type { EChartsOption } from 'echarts'
 import { api } from '@/api'
+import EChart from '@/components/EChart.vue'
 import { useAuthStore } from '@/stores/auth'
-import type { DeviceCloudAuthStatus, DeviceItem, DeviceSyncLogItem } from '@/types'
+import { suggestDeviceCategory } from '@/utils/device-category-hints'
+import type { DeviceCloudAuthStatus, DeviceItem, DeviceSyncLogItem, DeviceSyncSamples } from '@/types'
 
 const providers = ['MOCK', 'HUAWEI', 'HEALTH_CONNECT', 'APPLE_HEALTH', 'NIGHTSCOUT'] as const
 const categories = [
@@ -225,6 +264,8 @@ const dialog = reactive<{ visible: boolean; form: DeviceItem }>({
   form: emptyForm()
 })
 
+const categoryTouched = ref(false)
+
 const detail = reactive<{
   visible: boolean
   row: DeviceItem | null
@@ -233,6 +274,9 @@ const detail = reactive<{
   logs: DeviceSyncLogItem[]
   logsLoading: boolean
   revoking: boolean
+  selectedLogId: string
+  samples: DeviceSyncSamples | null
+  samplesLoading: boolean
 }>({
   visible: false,
   row: null,
@@ -240,7 +284,39 @@ const detail = reactive<{
   cloudLoading: false,
   logs: [],
   logsLoading: false,
-  revoking: false
+  revoking: false,
+  selectedLogId: '',
+  samples: null,
+  samplesLoading: false
+})
+
+const sampleChartOption = computed<EChartsOption | null>(() => {
+  const points = detail.samples?.points || []
+  if (!points.length) return null
+  return {
+    grid: { left: 48, right: 16, top: 24, bottom: 40 },
+    tooltip: { trigger: 'axis' },
+    xAxis: {
+      type: 'category',
+      data: points.map((p) => p.recordedAt),
+      axisLabel: { rotate: 30, fontSize: 10 }
+    },
+    yAxis: {
+      type: 'value',
+      name: 'mmol/L',
+      min: (v) => Math.max(0, Math.floor((v.min ?? 0) - 1)),
+      max: (v) => Math.ceil((v.max ?? 10) + 1)
+    },
+    series: [
+      {
+        type: 'line',
+        smooth: true,
+        showSymbol: points.length <= 24,
+        data: points.map((p) => p.glucoseValue),
+        name: '血糖'
+      }
+    ]
+  }
 })
 
 function emptyForm(): DeviceItem {
@@ -326,7 +402,33 @@ onMounted(load)
 
 function openDialog(row?: DeviceItem) {
   dialog.form = row ? { ...row, userId: row.userId || '' } : emptyForm()
+  categoryTouched.value = !!row?.deviceCategory
   dialog.visible = true
+  if (!row) maybeSuggestCategory()
+}
+
+function maybeSuggestCategory() {
+  if (categoryTouched.value) return
+  const hinted = suggestDeviceCategory(dialog.form.deviceSn, dialog.form.deviceName, dialog.form.deviceModel)
+  dialog.form.deviceCategory = hinted || ''
+}
+
+function syncRowClass({ row }: { row: DeviceSyncLogItem }) {
+  return row.id === detail.selectedLogId ? 'sync-row-active' : ''
+}
+
+async function onSyncRowClick(row: DeviceSyncLogItem) {
+  if (!detail.row) return
+  detail.selectedLogId = row.id
+  detail.samples = null
+  detail.samplesLoading = true
+  try {
+    detail.samples = await api.fetchDeviceSyncSamples(detail.row.id, row.id)
+  } catch (e) {
+    ElMessage.error((e as Error).message || '同步样本加载失败')
+  } finally {
+    detail.samplesLoading = false
+  }
 }
 
 async function openDetail(row: DeviceItem) {
@@ -334,6 +436,8 @@ async function openDetail(row: DeviceItem) {
   detail.row = row
   detail.cloudAuth = null
   detail.logs = []
+  detail.selectedLogId = ''
+  detail.samples = null
   detail.cloudLoading = true
   detail.logsLoading = true
   try {
@@ -430,6 +534,10 @@ async function remove(row: DeviceItem) {
 .pager { display: flex; justify-content: flex-end; margin-top: 16px; }
 .detail-block { margin-bottom: 20px; }
 .detail-title { font-weight: 600; margin-bottom: 8px; }
+.detail-sub { margin-left: 8px; font-weight: 400; color: #6b7280; font-size: 12px; }
 .detail-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .detail-line { color: #4b5563; line-height: 1.8; font-size: 13px; }
+.detail-empty { color: #9ca3af; font-size: 13px; padding: 12px 0; }
+:deep(.sync-row-active) { --el-table-tr-bg-color: #eff6ff; }
+:deep(.el-table__body tr) { cursor: pointer; }
 </style>

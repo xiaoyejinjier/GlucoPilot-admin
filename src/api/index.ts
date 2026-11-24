@@ -7,6 +7,7 @@ import type {
   AiChatContextView, AiAuditToolCallRow, AiAuditMemoryRow, AiAuditSummaryRow, AiAuditOcrTaskRow,
 ModerationHitAuditRow, LocalizationAuditRow,
   AccountStatus, AppUser, Banner, DashboardStats, DeviceCloudAuthStatus, DeviceItem, DevicePageResult, DeviceSyncLogItem,
+  DeviceSyncSamples,
   Feedback, FeedbackStatus, FeedbackType, FoodCategory, FoodItem,
   HealthArchive, MediaBizType, News, NineSlotResult, OpsAuditLogListData, OpsAuditLogPageResult,
   OpsAuditLogQuery, OpsAuditLogRawRow, OpsAuditLogRow, Role
@@ -448,6 +449,26 @@ const remote = {
       remark: row.remark || '',
       syncedAt: row.syncedAt ? fmtTime(row.syncedAt) : '—'
     }))
+  },
+  async fetchDeviceSyncSamples(deviceId: number, logId: string): Promise<DeviceSyncSamples> {
+    const row = await get<{
+      syncedAt?: string | null
+      sampleCount?: number
+      points?: Array<{
+        recordedAt?: string | null
+        nodeCode?: string
+        glucoseValue?: number | string
+      }>
+    }>(\/admin/v1/devices/\/sync-logs/\/samples\)
+    return {
+      syncedAt: row?.syncedAt ? fmtTime(row.syncedAt) : '—',
+      sampleCount: row?.sampleCount == null ? 0 : Number(row.sampleCount),
+      points: (row?.points || []).map((p) => ({
+        recordedAt: p.recordedAt ? fmtTime(p.recordedAt) : '—',
+        nodeCode: p.nodeCode || '',
+        glucoseValue: p.glucoseValue == null ? 0 : Number(p.glucoseValue)
+      }))
+    }
   },
   async fetchDeviceCloudAuth(id: number): Promise<DeviceCloudAuthStatus> {
     const row = await get<{
