@@ -1,5 +1,5 @@
 import {get,post,put} from '@/utils/request'
-export interface Withdrawal {orderNo:string;userId:string;doctorName?:string;amountCents:number;status:string;reviewNote:string;expectedPayoutDate:string|null;payoutReference:string|null;createdAt:string;version:string|number;provider?:string;payeeUserId?:string|null;transferState?:string;transferErrorCode?:string|null;transferStartedAt?:string|null;lastTransferAt?:string|null}
+export interface Withdrawal {orderNo:string;userId:string;doctorName?:string;accountStatus?:number|null;amountCents:number;status:string;reviewNote:string;expectedPayoutDate:string|null;payoutReference:string|null;createdAt:string;version:string|number;provider?:string;payeeUserId?:string|null;transferState?:string;transferErrorCode?:string|null;transferStartedAt?:string|null;lastTransferAt?:string|null}
 export interface WithdrawalSummary {eligible:boolean;sandbox:boolean;availableCents:string|number;frozenCents:string|number;businessDays:number;calendarRule:string;transferEnabled:boolean}
 export interface WorkDay {calendar_date:string;working_day:number;note:string}
 export const withdrawalApi={
