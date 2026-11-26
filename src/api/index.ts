@@ -96,6 +96,7 @@ function mapFood(f: FoodItem): FoodItem {
     carbs: Number(f.carbs),
     cal: Number(f.cal),
     gi: f.gi == null || f.gi === undefined ? null : Number(f.gi),
+    giDemoValue: f.giDemoValue == null ? null : Number(f.giDemoValue),
     description: f.description || '',
     image: f.image || '',
     enabled: !!f.enabled,

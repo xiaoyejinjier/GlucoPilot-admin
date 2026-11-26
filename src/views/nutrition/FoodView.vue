@@ -130,8 +130,14 @@
             <el-table-column label="热量 (kcal)" min-width="68" align="right" class-name="numeric-column">
               <template #default="{ row }">{{ row.cal }}</template>
             </el-table-column>
-            <el-table-column label="GI" min-width="40" align="right" class-name="numeric-column">
-              <template #default="{ row }">{{ row.gi ?? "—" }}</template>
+            <el-table-column label="GI" min-width="88" align="right" class-name="numeric-column">
+              <template #default="{ row }">
+                <span v-if="row.gi != null">{{ row.gi }}</span>
+                <span v-else-if="row.giDemoValue != null" title="模拟数字，仅演示，不用于计算">
+                  ≈{{ row.giDemoValue }} <small>模拟</small>
+                </span>
+                <span v-else>—</span>
+              </template>
             </el-table-column>
             <el-table-column label="启用" min-width="56" align="center" class-name="switch-column">
               <template #default="{ row }">

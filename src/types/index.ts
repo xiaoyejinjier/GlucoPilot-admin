@@ -199,6 +199,8 @@ export interface FoodItem {
   carbs: number // 每 100g 碳水 g
   cal: number // 每 100g 热量 kcal
   gi: number | null
+  /** Display-only simulated value; never send as the real GI. */
+  giDemoValue?: number | null
   image: string
   description: string
   enabled: boolean

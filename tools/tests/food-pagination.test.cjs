@@ -39,6 +39,15 @@ function createPage(query = {}, preferences = {}) {
   return { ...module.exports, calls, errors, hooks, listeners, observers, saves, watchers, route, reminders, api, storage, auth }
 }
 
+test('模拟GI不填入真实GI编辑项，保存时保持真实GI为空', async () => {
+  const page = createPage()
+  page.openFood({ id: 8, name: '西兰花', categoryId: 3, categoryName: '蔬菜类',
+    carbs: 4.3, cal: 34, gi: null, giDemoValue: 15, enabled: true, image: '' })
+  assert.equal(page.foodDialog.form.gi, null)
+  await page.saveFood()
+  assert.equal(page.saves[0].gi, null)
+})
+
 test('编辑并启用有实拍的旧食品保留空配图，不把显示用卡通图保存进数据库', async () => {
   const page = createPage()
   const food = { id: 7, name: '葡萄', categoryId: 1, categoryName: '水果类', image: '',
