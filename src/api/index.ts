@@ -460,7 +460,7 @@ const remote = {
         nodeCode?: string
         glucoseValue?: number | string
       }>
-    }>(\/admin/v1/devices/\/sync-logs/\/samples\)
+    }>(`/admin/v1/devices/${deviceId}/sync-logs/${encodeURIComponent(logId)}/samples`)
     return {
       syncedAt: row?.syncedAt ? fmtTime(row.syncedAt) : '—',
       sampleCount: row?.sampleCount == null ? 0 : Number(row.sampleCount),

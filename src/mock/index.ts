@@ -515,6 +515,9 @@ export const api = {
     await delay()
     return []
   },
+  async fetchDeviceSyncSamples(_deviceId: number, _logId: string): Promise<import('@/types').DeviceSyncSamples> {
+    throw new Error('设备同步样本需要连接后端后查看')
+  },
   async fetchDeviceCloudAuth(_id: number): Promise<import('@/types').DeviceCloudAuthStatus> {
     await delay()
     return { linked: false }
