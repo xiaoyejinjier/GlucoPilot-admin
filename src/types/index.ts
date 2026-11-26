@@ -1,4 +1,4 @@
-/* 后台管理系统公共类型定义（后续接后端时作为 DTO 对齐参考） */
+/* 后台管理系统公共类型定义（后续接后端时作�?DTO 对齐参考） */
 
 export type Role = 'admin' | 'editor' | 'doctor'
 export type ThemeId = 'green' | 'teal' | 'simple'
@@ -12,15 +12,15 @@ export interface AdminAccount {
   status: 1 | 0
   createdAt: string
   lastLoginAt: string
-  /** RuoYi 后端下发的角色与权限，仅用于前端可见性控制。 */
+  /** RuoYi 后端下发的角色与权限，仅用于前端可见性控制�?*/
   roles?: string[]
   permissions?: string[]
   menuPaths?: string[]
 }
 
-/* ------- C 端用户（后台被管对象） ------- */
+/* ------- C 端用户（后台被管对象�?------- */
 
-/** 与后端 CodeEnum.AccountStatus 对齐：0 禁用 / 1 正常 / 2 历史中间态 / 3 已注销 / 4 注销中（可恢复）。 */
+/** 与后�?CodeEnum.AccountStatus 对齐�? 禁用 / 1 正常 / 2 历史中间�?/ 3 已注销 / 4 注销中（可恢复）�?*/
 export type AccountStatus = 0 | 1 | 2 | 3 | 4
 
 export interface AppUser {
@@ -40,11 +40,11 @@ export interface AppUser {
   mealCount: number
   compliance: number // 血糖达标率 %
 
-  /* 注销相关（仅 accountStatus=4 且后端存在活跃凭据时有值；否则为 null） */
+  /* 注销相关（仅 accountStatus=4 且后端存在活跃凭据时有值；否则�?null�?*/
   cancelApplyTime?: string | null
-  /** 可恢复截止时间 epoch ms（服务端判定，前端不自行推算） */
+  /** 可恢复截止时�?epoch ms（服务端判定，前端不自行推算�?*/
   cancelDeadlineAt?: number | null
-  /** Worker 可清理时间 epoch ms */
+  /** Worker 可清理时�?epoch ms */
   cancelPurgeEligibleAt?: number | null
   cancelRecoverable?: boolean
   cancelPurgeOverdue?: boolean
@@ -76,7 +76,7 @@ export interface HealthArchive {
   summary: string
 }
 
-/* ------- 九时段记录看板 ------- */
+/* ------- 九时段记录看�?------- */
 export interface NineSlotRecord {
   nodeCode: string
   nodeName: string
@@ -141,7 +141,7 @@ export interface News {
   id: number
   title: string
   summary: string
-  /** 兼容接口回传；新建/编辑以 tagCodes / customTags 为准 */
+  /** 兼容接口回传；新�?编辑�?tagCodes / customTags 为准 */
   channel?: string
   tagCodes?: string[]
   customTags?: string[]
@@ -183,7 +183,7 @@ export interface MediaFile {
   createdAt: string
 }
 
-/* ------- 营养库 ------- */
+/* ------- 营养�?------- */
 export interface FoodCategory {
   id: number
   name: string
@@ -196,8 +196,8 @@ export interface FoodItem {
   name: string
   categoryId: number
   categoryName: string
-  carbs: number // 每 100g 碳水 g
-  cal: number // 每 100g 热量 kcal
+  carbs: number // �?100g 碳水 g
+  cal: number // �?100g 热量 kcal
   gi: number | null
   /** Display-only simulated value; never send as the real GI. */
   giDemoValue?: number | null
@@ -241,6 +241,18 @@ export interface DeviceSyncLogItem {
   createdCount: number
   remark: string
   syncedAt: string
+}
+
+export interface DeviceSyncSamplePoint {
+  recordedAt: string
+  nodeCode: string
+  glucoseValue: number
+}
+
+export interface DeviceSyncSamples {
+  syncedAt: string
+  sampleCount: number
+  points: DeviceSyncSamplePoint[]
 }
 
 export interface DeviceCloudAuthStatus {
@@ -316,31 +328,31 @@ export interface OperationLog {
   createdAt: string
 }
 
-/* ------- AI 模型配置（/admin/v1/ai/models，字段命名与后端冻结契约一致，除 id 外均可能为 null） ------- */
+/* ------- AI 模型配置�?admin/v1/ai/models，字段命名与后端冻结契约一致，�?id 外均可能�?null�?------- */
 
 /**
- * 厂商编码：1=DeepSeek 自研；2=OpenAI 兼容；3=通义千问；4=文心一言；5=其他。
- * 契约文档写的是"2/3/4=OpenAI 兼容"，后端实际 PROVIDER_TEXT 为上面这套，
- * 因此展示一律优先用后端下发的 providerText，本映射只用于编辑弹窗的下拉选项。
+ * 厂商编码�?=DeepSeek 自研�?=OpenAI 兼容�?=通义千问�?=文心一言�?=其他�?
+ * 契约文档写的�?2/3/4=OpenAI 兼容"，后端实�?PROVIDER_TEXT 为上面这套，
+ * 因此展示一律优先用后端下发�?providerText，本映射只用于编辑弹窗的下拉选项�?
  */
 export type AiProviderCode = 1 | 2 | 3 | 4 | 5
 
-/** 密钥来源：db=后台已单独配置；yaml=沿用环境变量/yaml；none=两边都没有 */
+/** 密钥来源：db=后台已单独配置；yaml=沿用环境变量/yaml；none=两边都没�?*/
 export type AiKeySource = 'db' | 'yaml' | 'none'
 
-/** 这条配置当前是否真的在生效：db=数据库生效；yaml=仅是回落值 */
+/** 这条配置当前是否真的在生效：db=数据库生效；yaml=仅是回落�?*/
 export type AiConfigSource = 'db' | 'yaml'
 
 /**
- * 事实上的角色（与 isDefault/isEnabled 的"意愿"区分开）：
+ * 事实上的角色（与 isDefault/isEnabled �?意愿"区分开）：
  * text-default=当前文本对话实际在用；vision=当前视觉实际在用；null=启用了但没在供能
  */
 export type AiEffectiveRole = 'text-default' | 'vision'
 
-/** 文本默认值是"怎么选出来的"，与后端 AiRuntimeConfigService 的判据常量对齐 */
-export type AiDefaultReason = '默认标记' | '唯一启用的文本模型' | '最近修改的文本模型' | 'yaml 兜底'
+/** 文本默认值是"怎么选出来的"，与后端 AiRuntimeConfigService 的判据常量对�?*/
+export type AiDefaultReason = '默认标记' | '唯一启用的文本模�? | '最近修改的文本模型' | 'yaml 兜底'
 
-/** 连通性测试分类，与后端 AiModelTestResult.category 对齐 */
+/** 连通性测试分类，与后�?AiModelTestResult.category 对齐 */
 export type AiTestCategory =
   | 'OK'
   | 'AUTH'
@@ -351,7 +363,7 @@ export type AiTestCategory =
   | 'UNKNOWN'
 
 export interface AiModelRow {
-  /** Long 序列化为字符串，务必按 string 处理，不要再 Number() 转换 */
+  /** Long 序列化为字符串，务必�?string 处理，不要再 Number() 转换 */
   id: string
   /** 引用键，新增必填，修改时不可变更 */
   modelCode: string
@@ -361,7 +373,7 @@ export interface AiModelRow {
   providerText: string
   /** 模型能力集合（逗号分隔：text/vision/tool/stream）。历史行可能为空，按 text 处理 */
   capability?: string | null
-  /** 后端下发的能力文案（如「文本 / 工具 / 流式」） */
+  /** 后端下发的能力文案（如「文�?/ 工具 / 流式」） */
   capabilityText?: string
   apiBaseUrl?: string | null
   /** 真正发给 provider 的模型名 */
@@ -369,12 +381,12 @@ export interface AiModelRow {
   temperature?: number | null
   topP?: number | null
   maxTokens?: number | null
-  /** 仅 DeepSeek 自研模型有意义 */
+  /** �?DeepSeek 自研模型有意�?*/
   thinking?: boolean | null
   timeoutMs?: number | null
   isDefault: number
   isEnabled: number
-  /** 形如 sk-****klmn，可能为空字符串；禁止回填到输入框 */
+  /** 形如 sk-****klmn，可能为空字符串；禁止回填到输入�?*/
   apiKeyMasked: string
   apiKeySource: AiKeySource
   /** 修改时必须原样回传，后端做乐观锁校验 */
@@ -391,26 +403,26 @@ export interface AiModelRow {
   updatedAt?: string | null
 }
 
-/** 列表接口附带的"当前生效情况"，用来解释"为什么用的是这个模型" */
-/** AI 用量报表的一行：某一天 × 某个场景 × 某个模型（数据源 ai_call_log）。 */
+/** 列表接口附带�?当前生效情况"，用来解�?为什么用的是这个模型" */
+/** AI 用量报表的一行：某一�?× 某个场景 × 某个模型（数据源 ai_call_log）�?*/
 export interface AiUsageRow {
   /** yyyy-MM-dd */
   date: string
   /** 场景编码（CHAT / SUMMARY / MEMORY / ...）；空串＝未归属（框架内部调用、启动探活） */
   sceneCode: string
-  /** 场景中文名；未知编码回显编码本身，空串显示「（未归属）」 */
+  /** 场景中文名；未知编码回显编码本身，空串显示「（未归属）�?*/
   sceneLabel: string
-  /** 模型编码；历史行没记模型时为「（未记录）」 */
+  /** 模型编码；历史行没记模型时为「（未记录）�?*/
   modelCode: string
   promptTokens: number
   completionTokens: number
-  /** 缓存命中 / 未命中的 token；两列都为 0 表示上游没上报过 */
+  /** 缓存命中 / 未命中的 token；两列都�?0 表示上游没上报过 */
   cacheHitTokens: number
   cacheMissTokens: number
-  /** 命中率 0~1（后端保留 4 位）；null 表示「没上报」，与 0% 是两回事 */
+  /** 命中�?0~1（后端保�?4 位）；null 表示「没上报」，�?0% 是两回事 */
   cacheHitRate: number | null
   totalTokens: number
-  /** 调用次数（账本行数：一个场景调几次算几次，不是会话条数） */
+  /** 调用次数（账本行数：一个场景调几次算几次，不是会话条数�?*/
   calls: number
   /** 其中失败次数（ok=0）：失败同样消耗配额，所以单列而不从合计里剔除 */
   failedCalls: number
@@ -432,11 +444,11 @@ export interface AiUsageReport {
   endDate: string
   rows: AiUsageRow[]
   totals: AiUsageTotals
-  /** 口径说明，前后端必须一致：按调用（ai_call_log），与 chat_message 的按轮不可相加 */
+  /** 口径说明，前后端必须一致：按调用（ai_call_log），�?chat_message 的按轮不可相�?*/
   note: string
 }
 export interface AiModelListMeta {
-  /** 当前文本对话实际使用的模型编码 */
+  /** 当前文本对话实际使用的模型编�?*/
   textDefaultCode: string
   textDefaultSource: AiConfigSource
   textDefaultReason: AiDefaultReason | string
@@ -447,7 +459,7 @@ export interface AiModelSavePayload {
   modelCode?: string
   modelName: string
   providerCode: number
-  /** 模型能力集合（逗号分隔）；留空=新建按 text、编辑保持原能力；非法标记后端返回 400 */
+  /** 模型能力集合（逗号分隔）；留空=新建�?text、编辑保持原能力；非法标记后端返�?400 */
   capability?: string | null
   apiBaseUrl?: string | null
   modelEndpoint: string
@@ -456,25 +468,25 @@ export interface AiModelSavePayload {
   maxTokens?: number | null
   thinking?: boolean | null
   timeoutMs?: number | null
-  /** 明文密钥；留空 = 不修改已有密钥（后端语义） */
+  /** 明文密钥；留�?= 不修改已有密钥（后端语义�?*/
   apiKey?: string | null
-  /** true = 显式清空密钥（回到沿用 yaml） */
+  /** true = 显式清空密钥（回到沿�?yaml�?*/
   clearApiKey?: boolean
   isEnabled: number
   isDefault: number
   remark?: string | null
   /** 新增/编辑保存时跳过连通性校验（默认 false，服务端会真发一次探针） */
   skipVerify?: boolean
-  /** 跳过校验的原因；skipVerify=true 时必填 */
+  /** 跳过校验的原因；skipVerify=true 时必�?*/
   verifySkipReason?: string | null
-  /** 修改时必填 */
+  /** 修改时必�?*/
   configVersion?: number
 }
 
 export interface AiModelTestResult {
   ok: boolean
   category: AiTestCategory
-  /** 后端给的一句话建议，直接展示 */
+  /** 后端给的一句话建议，直接展�?*/
   advice: string
   elapsedMs: number
   /** 上游回显的模型名 */
@@ -485,15 +497,15 @@ export interface AiModelTestResult {
 
 /* ------- AI 提示词管理（/admin/v1/ai-prompt-templates，字段命名与后端契约一致） ------- */
 
-/** 场景（列表接口随 records 一起下发），activeSource 用来解释"线上到底在用哪份提示词" */
+/** 场景（列表接口随 records 一起下发），activeSource 用来解释"线上到底在用哪份提示�? */
 export interface AiPromptScene {
   sceneCode: string
-  /** 与 yaml 配置项对齐的键名，如 chat */
+  /** �?yaml 配置项对齐的键名，如 chat */
   configKey: string
   sceneName: string
-  /** 视觉场景（图片/识糖）标识 */
+  /** 视觉场景（图�?识糖）标�?*/
   requiresVision: boolean
-  /** 代码内置兜底版本号，如 v1 */
+  /** 代码内置兜底版本号，�?v1 */
   builtinVersion: string
   /** 当前生效版本标识，如 chat@v1 */
   activeVersion: string
@@ -509,17 +521,17 @@ export interface AiPromptTemplateRow {
   id: number
   sceneCode: string
   sceneName: string
-  /** 可选展示名，如「对话（文本） v1」 */
+  /** 可选展示名，如「对话（文本�?v1�?*/
   templateName: string
   version: string
   versionNo: number
   promptText: string
   variables: string[]
-  /** 后端下发的原始 JSON 串，variables 为空时兜底解析 */
+  /** 后端下发的原�?JSON 串，variables 为空时兜底解�?*/
   variablesJson: string
   /** 1=启用 0=草稿或停用；是否真的在线上生效看 active */
   status: number
-  /** true = 该场景当前线上生效的那一条（同场景唯一） */
+  /** true = 该场景当前线上生效的那一条（同场景唯一�?*/
   active: boolean
   changeNote: string
   /** 乐观锁版本号：编辑草稿时必须原样回传 */
@@ -539,7 +551,7 @@ export interface AiPromptTemplateSavePayload {
   version?: string | null
   promptText: string
   variables?: string[] | null
-  /** 0=草稿 1=启用；可空（空 = 草稿） */
+  /** 0=草稿 1=启用；可空（�?= 草稿�?*/
   status?: number | null
   changeNote?: string | null
   /** 编辑草稿时必填（乐观锁） */
@@ -554,7 +566,7 @@ export interface AiPromptSaveResult {
   appended: boolean
 }
 
-/* ------- AI 场景 → 模型绑定（/admin/v1/ai-scenes） ------- */
+/* ------- AI 场景 �?模型绑定�?admin/v1/ai-scenes�?------- */
 
 /** 可绑定的模型（列表接口附带下发） */
 export interface AiSceneModelOption {
@@ -563,9 +575,9 @@ export interface AiSceneModelOption {
   providerCode: number
   isDefault: boolean
   providerName: string
-  /** 能力集合（如 text,tool,stream / vision,stream）：页面按场景用途过滤下拉 */
+  /** 能力集合（如 text,tool,stream / vision,stream）：页面按场景用途过滤下�?*/
   capability?: string | null
-  /** 能力中文（「文本 / 工具 / 流式」） */
+  /** 能力中文（「文�?/ 工具 / 流式」） */
   capabilityText?: string
 }
 
@@ -584,13 +596,13 @@ export interface AiSceneRow {
   /** 乐观锁版本号：该场景已有配置行时保存必填 */
   configVersion: number
   remark: string | null
-  /** 库里是否已有该场景的覆盖配置行 */
+  /** 库里是否已有该场景的覆盖配置�?*/
   configured: boolean
   /** 实际生效的模型编码（含兜底） */
   effectiveModelCode: string | null
-  /** 实际生效模型的来源：db=库内绑定；其它=可见值原样展示（yaml 等兜底） */
+  /** 实际生效模型的来源：db=库内绑定；其�?可见值原样展示（yaml 等兜底） */
   effectiveModelSource: string
-  /** yaml/环境变量里的兜底值，用于解释"留空会继承成什么" */
+  /** yaml/环境变量里的兜底值，用于解释"留空会继承成什�? */
   yamlModelCode: string | null
   yamlTemperature: number | null
   yamlMaxTokens: number | null
@@ -606,7 +618,7 @@ export interface AiSceneListData {
   models: AiSceneModelOption[] | null
 }
 
-/** 归一化后的列表结果：页面层拿到的 records/models 一定不是 null */
+/** 归一化后的列表结果：页面层拿到的 records/models 一定不�?null */
 export interface AiSceneListResult {
   records: AiSceneRow[]
   models: AiSceneModelOption[]
@@ -618,7 +630,7 @@ export interface AiSceneSavePayload {
   temperature?: number | null
   maxTokens?: number | null
   thinking?: boolean | null
-  /** 0/1，必填 */
+  /** 0/1，必�?*/
   status: number
   remark?: string | null
   /** true = 清空该场景全部覆盖，改回继承 */
@@ -627,17 +639,17 @@ export interface AiSceneSavePayload {
   configVersion?: number
 }
 
-/* ------- 用户 AI 长期记忆（/admin/v1/users/{id}/chat-memories，契约 4.14 查询 / 4.15 全删） ------- */
+/* ------- 用户 AI 长期记忆�?admin/v1/users/{id}/chat-memories，契�?4.14 查询 / 4.15 全删�?------- */
 
 /**
- * 后端原始行。注意 id / sourceSessionId 是后端 Long 序列化出来的**字符串**（防精度丢失），
- * total 同理，一律按字符串处理，禁止参与数值运算。
+ * 后端原始行。注�?id / sourceSessionId 是后�?Long 序列化出来的**字符�?*（防精度丢失），
+ * total 同理，一律按字符串处理，禁止参与数值运算�?
  */
 export interface AiMemoryRawRow {
   id: string | number | null
   memoryKey?: string | null
   memoryText?: string | null
-  /** 0-100，页面按 >=80 绿 / 60-79 黄 / <60 灰 分档 */
+  /** 0-100，页面按 >=80 �?/ 60-79 �?/ <60 �?分档 */
   confidence?: number | null
   sourceSessionId?: string | number | null
   updatedAt?: string | null
@@ -663,13 +675,13 @@ export interface AiMemoryListData {
 
 export interface AiMemoryPageResult {
   records: AiMemoryRow[]
-  /** 已转成 number（分页组件要求整数） */
+  /** 已转�?number（分页组件要求整数） */
   total: number
 }
 
-/* ------- AI 审计日志（/admin/v1/ops-audit-logs，只读查询） ------- */
+/* ------- AI 审计日志�?admin/v1/ops-audit-logs，只读查询） ------- */
 
-/** 后端原始行：除 costMs / resultCode 外均为字符串，可空字段很多 */
+/** 后端原始行：�?costMs / resultCode 外均为字符串，可空字段很�?*/
 export interface OpsAuditLogRawRow {
   id: string | number | null
   opsId?: string | number | null
@@ -686,7 +698,7 @@ export interface OpsAuditLogRawRow {
   requestMethod?: string | null
   clientIp?: string | null
   costMs?: number | null
-  /** 0 = 成功；其它为失败码 */
+  /** 0 = 成功；其它为失败�?*/
   resultCode?: number | null
   gmtCreate?: string | null
 }
@@ -720,7 +732,7 @@ export interface OpsAuditLogPageResult {
   total: number
 }
 
-/** 审计日志查询条件：全部可空，空值不参与查询串 */
+/** 审计日志查询条件：全部可空，空值不参与查询�?*/
 export interface OpsAuditLogQuery {
   moduleCode?: string
   actionCode?: string
@@ -745,31 +757,31 @@ export interface DashboardStats {
   nodeHeat: Array<{ node: string; value: number }>
 }
 
-/* ---- AI 会话审计（V53 权限点 ai:chat:audit，接口 /admin/v1/ai/chat-sessions） ---- */
+/* ---- AI 会话审计（V53 权限�?ai:chat:audit，接�?/admin/v1/ai/chat-sessions�?---- */
 
-/** 会话列表的一行：只有元数据，不含任何消息正文。 */
+/** 会话列表的一行：只有元数据，不含任何消息正文�?*/
 export interface AiChatSessionRow {
   id: number
   userId: number
-  /** 用户昵称（user_profile.nickname）；用户没填过则为 null */
+  /** 用户昵称（user_profile.nickname）；用户没填过则�?null */
   userNickname: string | null
   title: string | null
-  /** 0 归档 1 进行中 2 已结束 */
+  /** 0 归档 1 进行�?2 已结�?*/
   sessionStatus: number
-  /** 1 纯文字 2 纯语音 3 混合 */
+  /** 1 纯文�?2 纯语�?3 混合 */
   sessionType: number
   modelCode: string | null
   systemPromptVer: string | null
   msgCount: number
-  /** 该会话在 chat_context 里记了几轮分片；0 = 没有可查的 token 构成 */
+  /** 该会话在 chat_context 里记了几轮分片；0 = 没有可查�?token 构成 */
   contextRounds: number
-  /** 是否已有滚动摘要（后端把 MEDIUMTEXT 折成布尔，不返回摘要原文） */
+  /** 是否已有滚动摘要（后端把 MEDIUMTEXT 折成布尔，不返回摘要原文�?*/
   hasSummary: boolean
   lastMsgAt: string | null
   createdAt: string | null
 }
 
-/** 消息预览：正文只给前 200 字，看全文必须再请求一次（那一次会在后端写审计）。 */
+/** 消息预览：正文只给前 200 字，看全文必须再请求一次（那一次会在后端写审计）�?*/
 export interface AiChatMessageRow {
   id: number
   seqNo: number
@@ -787,7 +799,7 @@ export interface AiChatMessageRow {
   createdAt: string | null
 }
 
-/** 单条消息全文。 */
+/** 单条消息全文�?*/
 export interface AiChatMessageDetail {
   id: number
   sessionId: number
@@ -811,8 +823,8 @@ export interface AiChatMessageDetail {
 }
 
 /**
- * 一个上下文分片（`chat_context` 的一行元数据）。
- * 只有类型、键、估算 token、顺序——正文与摘要不在这里，分别落在 chat_message 与 chat_session。
+ * 一个上下文分片（`chat_context` 的一行元数据）�?
+ * 只有类型、键、估�?token、顺序——正文与摘要不在这里，分别落�?chat_message �?chat_session�?
  */
 export interface AiChatContextShard {
   /** 1 系统提示 3 历史摘要 5 工具结果 6 其他（与后端 ChatContextEntity.contextType 一致） */
@@ -821,13 +833,13 @@ export interface AiChatContextShard {
   contextKey: string | null
   tokenEstimate: number | null
   sortNo: number | null
-  /** V78：本轮窗口是否滑动（丢弃了窗口外的旧消息）；只有历史分片带值，其余为 null */
+  /** V78：本轮窗口是否滑动（丢弃了窗口外的旧消息）；只有历史分片带值，其余�?null */
   windowShifted?: boolean | null
-  /** V78：本轮生效的窗口条数上限；同上，只有历史分片带值 */
+  /** V78：本轮生效的窗口条数上限；同上，只有历史分片带�?*/
   windowMessages?: number | null
 }
 
-/** 一轮 prompt 的分片组成。token 是装配期估算，不是厂商返回的 usage。 */
+/** 一�?prompt 的分片组成。token 是装配期估算，不是厂商返回的 usage�?*/
 export interface AiChatContextRound {
   contextRound: number
   triggerMsgId: number | null
@@ -835,11 +847,11 @@ export interface AiChatContextRound {
   modelCode: string | null
   totalTokens: number
   shards: AiChatContextShard[]
-  /** 后端拼好的一句话说明，如「本轮窗口已滑动 · 窗口 20 条上限」；老数据为空 */
+  /** 后端拼好的一句话说明，如「本轮窗口已滑动 · 窗口 20 条上限」；老数据为�?*/
   notice?: string | null
 }
 
-/** 一个会话的分片审计（GET /admin/v1/ai/chat-sessions/{id}/context）。 */
+/** 一个会话的分片审计（GET /admin/v1/ai/chat-sessions/{id}/context）�?*/
 export interface AiChatContextView {
   sessionId: number
   rounds: AiChatContextRound[]
@@ -847,8 +859,8 @@ export interface AiChatContextView {
 }
 
 /**
- * 工具调用审计行（GET /admin/v1/ai/audit/tool-calls）。
- * `resultDigest` 是 ≤512 字的返回摘要——工具的真实返回内容不在库里（V21 的设计）。
+ * 工具调用审计行（GET /admin/v1/ai/audit/tool-calls）�?
+ * `resultDigest` �?�?12 字的返回摘要——工具的真实返回内容不在库里（V21 的设计）�?
  */
 export interface AiAuditToolCallRow {
   id: number
@@ -865,24 +877,24 @@ export interface AiAuditToolCallRow {
   createdAt: string | null
 }
 
-/** 长期记忆审计行（GET /admin/v1/ai/audit/memories）。 */
+/** 长期记忆审计行（GET /admin/v1/ai/audit/memories）�?*/
 export interface AiAuditMemoryRow {
   id: number
   userId: number
   memoryKey: string
   memoryText: string
   sourceSessionId: number | null
-  /** 写入来源（V86）：EXPLICIT=用户当轮亲口 / BATCH=会话结束后模型抽取 / null=本列上线前的历史数据 */
+  /** 写入来源（V86）：EXPLICIT=用户当轮亲口 / BATCH=会话结束后模型抽�?/ null=本列上线前的历史数据 */
   writeSource: 'EXPLICIT' | 'BATCH' | null
   /** 0~100 */
   confidence: number
-  /** 逻辑删除标记；只有 includeDeleted=1 的查询才会出现已删行 */
+  /** 逻辑删除标记；只�?includeDeleted=1 的查询才会出现已删行 */
   deleted: boolean
   createdAt: string | null
   updatedAt: string | null
 }
 
-/** 滚动摘要审计行（GET /admin/v1/ai/audit/summaries）。 */
+/** 滚动摘要审计行（GET /admin/v1/ai/audit/summaries）�?*/
 export interface AiAuditSummaryRow {
   sessionId: number
   userId: number
@@ -894,14 +906,14 @@ export interface AiAuditSummaryRow {
   summaryUpdatedAt: string | null
 }
 
-/** 多模态识别任务审计行（GET /admin/v1/ai/audit/ocr-tasks）。 */
+/** 多模态识别任务审计行（GET /admin/v1/ai/audit/ocr-tasks）�?*/
 export interface AiAuditOcrTaskRow {
   id: number
   userId: number
   mediaId: number
-  /** 1 血糖 2 餐食 */
+  /** 1 血�?2 餐食 */
   bizType: number
-  /** 0 待处理 1 进行中 2 成功 3 失败 */
+  /** 0 待处�?1 进行�?2 成功 3 失败 */
   taskStatus: number
   /** = finished_at - gmt_create，未完成时为 null */
   durationMs: number | null
@@ -912,14 +924,14 @@ export interface AiAuditOcrTaskRow {
   finishedAt: string | null
 }
 
-/** 社区审核命中审计行（GET /admin/v1/community/moderation-hits）。 */
+/** 社区审核命中审计行（GET /admin/v1/community/moderation-hits）�?*/
 export interface ModerationHitAuditRow {
   id: number
   targetType: string
   targetId: number
   revision: number | null
   categoryCode: string
-  /** 1 低 2 中 3 高 */
+  /** 1 �?2 �?3 �?*/
   severity: number
   confidence: number | null
   startOffset: number | null
@@ -933,7 +945,7 @@ export interface ModerationHitAuditRow {
   createdAt: string | null
 }
 
-/** 翻译缓存审计行（GET /admin/v1/localizations/audit）。 */
+/** 翻译缓存审计行（GET /admin/v1/localizations/audit）�?*/
 export interface LocalizationAuditRow {
   kind: string
   resourceId: string
